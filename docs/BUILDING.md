@@ -21,7 +21,7 @@ Use a clean virtual environment on the target OS. The build must be performed on
 
 ```bash
 python -m pip install . pyinstaller
-pyinstaller --noconfirm --clean --windowed --name AudioEnvironmentFingerprinter --paths src src/audio_enviro_fingerprint/__main__.py
+pyinstaller --noconfirm --clean --windowed --name AudioEnvironmentFingerprinter --paths src run_app.py
 ```
 
 The resulting application folder is in `dist/AudioEnvironmentFingerprinter`. Windows produces an `.exe`; Linux produces a native executable. The GitHub Actions matrix runs this command on Windows and Ubuntu, smoke-launches the packaged GUI, and uploads separate beta artifacts.

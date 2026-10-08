@@ -14,6 +14,7 @@ Scope: initial beta source, tests, storage, analysis math, and packaging workflo
 | Required | Export recomputed the file hash after analysis, potentially pairing a changed source with stale analysis. | Import pins the original SHA-256, verifies it stayed stable during load, and export stops if the source hash changes. |
 | Required | Stereo averaging could cancel anti-phase content. | Analysis selects channel 1 explicitly and reports the channel count; full multichannel review remains TODO. |
 | Required | Decay routine returned `20 / slope` while calling it RT60. | It returns `60 / slope` from a -5 to -25 dB regression; synthetic decay test validates this relationship. |
+| Required | PyInstaller's standalone script context broke the package-relative import in `__main__.py`. | Packaging now uses top-level `run_app.py` with an absolute package import; CI launches the bundled GUI after build. |
 
 ## Review by axis
 
