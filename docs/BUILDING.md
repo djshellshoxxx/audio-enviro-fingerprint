@@ -24,7 +24,7 @@ python -m pip install . pyinstaller
 pyinstaller --noconfirm --clean --windowed --name AudioEnvironmentFingerprinter --paths src src/audio_enviro_fingerprint/__main__.py
 ```
 
-The resulting application folder is in `dist/AudioEnvironmentFingerprinter`. Windows produces an `.exe`; Linux produces a native executable. The GitHub Actions matrix runs this command on Windows and Ubuntu and uploads separate beta artifacts.
+The resulting application folder is in `dist/AudioEnvironmentFingerprinter`. Windows produces an `.exe`; Linux produces a native executable. The GitHub Actions matrix runs this command on Windows and Ubuntu, smoke-launches the packaged GUI, and uploads separate beta artifacts.
 
 ## Beta build identifiers
 

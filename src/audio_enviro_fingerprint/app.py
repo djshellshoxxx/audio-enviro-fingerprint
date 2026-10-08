@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -244,5 +245,8 @@ class FingerprinterApp(tk.Tk):
 
 
 def main():
-    FingerprinterApp().mainloop()
+    app = FingerprinterApp()
+    if os.environ.get("AEFP_SMOKE_TEST") == "1":
+        app.after(750, app._close)
+    app.mainloop()
 

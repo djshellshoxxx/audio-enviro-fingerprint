@@ -25,9 +25,10 @@ These are software regression tests. They are not scientific validation on repre
 - All automated unit tests pass on Linux and Windows.
 - PyInstaller build completes separately on Linux and Windows.
 - Fresh installs launch and open a test PCM WAV on both operating systems.
+- Packaged GUI starts and exits under a short CI smoke test on Windows and Linux.
 - SHA-256 and fingerprint hashes are independently recomputed from exported data.
 - UI presents channel selection, unsupported input limitations, heuristic transition status, and comparison-score caveat.
 - Known limitations are shipped with the beta.
 
-Only automated unit tests and the source build are locally testable in the current workspace. Native Windows launch and GUI interaction require the CI runner or a Windows test machine.
+Only automated unit tests and the source build are locally testable in the current workspace. Native Windows launch and GUI interaction require the CI runner or a Windows test machine. The CI smoke test validates window construction and startup, not human usability or end-to-end interaction with a recording.
 

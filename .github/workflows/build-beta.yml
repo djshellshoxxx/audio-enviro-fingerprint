@@ -30,6 +30,16 @@ jobs:
           PYTHONPATH: src
       - name: Build application bundle
         run: pyinstaller --noconfirm --clean --windowed --name AudioEnvironmentFingerprinter --paths src src/audio_enviro_fingerprint/__main__.py
+      - name: Smoke launch Linux GUI
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ./dist/AudioEnvironmentFingerprinter/AudioEnvironmentFingerprinter
+        env:
+          AEFP_SMOKE_TEST: "1"
+      - name: Smoke launch Windows GUI
+        if: runner.os == 'Windows'
+        run: .\dist\AudioEnvironmentFingerprinter\AudioEnvironmentFingerprinter.exe
+        env:
+          AEFP_SMOKE_TEST: "1"
       - name: Upload Linux beta
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4

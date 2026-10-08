@@ -25,5 +25,5 @@ Scope: initial beta source, tests, storage, analysis math, and packaging workflo
 
 ## Verification
 
-Local Linux checks: 15 unit tests passed; `compileall` passed; package wheel built. Native PyInstaller builds and GUI interaction are delegated to separate Windows/Linux CI runners because PyInstaller is unavailable locally and outbound package access is blocked.
+Local Linux checks: 15 unit tests passed; `compileall` passed; package wheel built. Native PyInstaller builds and GUI startup smoke tests run on separate Windows/Linux CI runners because PyInstaller is unavailable locally and outbound package access is blocked.
 
