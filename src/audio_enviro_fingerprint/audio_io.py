@@ -53,6 +53,9 @@ def load_wav(path: str | Path) -> AudioData:
         raise ValueError(f"Unable to read PCM WAV: {exc}") from exc
     if channels < 1 or rate < 1 or not raw:
         raise ValueError("WAV contains no analyzable audio frames")
+    expected_bytes = frames * channels * width
+    if len(raw) != expected_bytes:
+        raise ValueError("WAV payload is truncated or inconsistent with its declared frame count")
     scalar = _decode_pcm(raw, width)
     if len(scalar) % channels:
         raise ValueError("WAV data ends in a partial channel frame")

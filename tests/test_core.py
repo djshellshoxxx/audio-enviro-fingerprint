@@ -16,19 +16,6 @@ from audio_enviro_fingerprint.methods.reverberation import estimate_t20
 from audio_enviro_fingerprint.transitions import detect_transitions
 
 
-def write_wav(path: Path, samples, rate=8000, width=2):
-    import numpy as np
-
-    peak = (1 << (8 * width - 1)) - 1
-    data = np.asarray(samples, dtype=float)
-    encoded = np.round(np.clip(data, -1, 1) * peak).astype(f"<i{width}")
-    with wave.open(str(path), "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(width)
-        wf.setframerate(rate)
-        wf.writeframes(encoded.tobytes())
-
-
 class IntegrityTests(unittest.TestCase):
     def test_sha256_is_hash_of_original_bytes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -94,6 +81,18 @@ class AudioIoTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.wav"
             path.write_bytes(b"not a wave")
+            with self.assertRaises(ValueError):
+                load_wav(path)
+
+    def test_rejects_truncated_pcm_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "truncated.wav"
+            with wave.open(str(path), "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(8000)
+                wf.writeframes(b"\x01\x00" * 32)
+            path.write_bytes(path.read_bytes()[:-4])
             with self.assertRaises(ValueError):
                 load_wav(path)
 
@@ -185,6 +184,10 @@ class TransitionTests(unittest.TestCase):
     def test_empty_or_single_frame_has_no_transition(self):
         event = detect_transitions(type("Analysis", (), {"frames": []})())
         self.assertEqual(event, [])
+
+    def test_rejects_non_finite_minimum_separation(self):
+        with self.assertRaises(ValueError):
+            detect_transitions(type("Analysis", (), {"frames": []})(), minimum_separation_seconds=float("nan"))
 
 
 if __name__ == "__main__":

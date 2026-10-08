@@ -71,6 +71,7 @@ class FingerprinterApp(tk.Tk):
         ttk.Label(analysis_tab, text="Transition candidates", font=("Segoe UI", 12, "bold")).pack(anchor="w")
         self.timeline = tk.Canvas(analysis_tab, height=100, background="#0b1220", highlightthickness=0)
         self.timeline.pack(fill="x", pady=(6, 12))
+        self.timeline.bind("<Configure>", self._redraw_timeline)
         self.transitions = ttk.Treeview(analysis_tab, columns=("time", "strength", "evidence"), show="headings", height=6)
         for col, title, width in (("time", "Time (s)", 110), ("strength", "Change score", 130), ("evidence", "Measured changes", 650)):
             self.transitions.heading(col, text=title)
@@ -170,6 +171,10 @@ class FingerprinterApp(tk.Tk):
             x = 24 + event.timestamp_seconds / self.analysis.duration_seconds * (width - 48)
             self.timeline.create_line(x, 26, x, 66, fill="#fb7185", width=2)
             self.timeline.create_text(x, 16, text=f"{event.timestamp_seconds:.1f}s", fill="#fda4af")
+
+    def _redraw_timeline(self, _event=None):
+        if self.analysis:
+            self._draw_timeline(detect_transitions(self.analysis))
 
     def compare_file(self):
         if not self.fingerprint:

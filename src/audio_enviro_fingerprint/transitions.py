@@ -16,8 +16,8 @@ def detect_transitions(analysis, threshold: float = 0.35,
                        minimum_separation_seconds: float = 3.0) -> list[Transition]:
     if not math.isfinite(threshold) or threshold < 0:
         raise ValueError("Threshold must be finite and nonnegative")
-    if minimum_separation_seconds < 0:
-        raise ValueError("Minimum separation cannot be negative")
+    if not math.isfinite(minimum_separation_seconds) or minimum_separation_seconds < 0:
+        raise ValueError("Minimum separation must be finite and nonnegative")
     frames = getattr(analysis, "frames", [])
     candidates = []
     for before, after in zip(frames, frames[1:]):
