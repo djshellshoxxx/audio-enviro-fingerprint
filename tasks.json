@@ -3,7 +3,7 @@
   "tasks": [
     {"id": "beta-core", "status": "implemented", "title": "Forensic-safe input, integrity, acoustic descriptors, transitions, comparisons, notes, export"},
     {"id": "beta-tests", "status": "in_progress", "title": "Cross-platform unit, package, and GUI smoke QA"},
-    {"id": "environment-recurrence", "status": "planned", "title": "Detect recurring environment segments within and across recordings"},
+    {"id": "environment-recurrence", "status": "partial", "title": "Detect recurring environment segments within and across recordings"},
     {"id": "comparison-explainability", "status": "partial", "title": "Expand transparent feature-level explanations for all validated methods"},
     {"id": "reference-acquisition", "status": "planned", "title": "Guided, documented known-location exemplar acquisition"},
     {"id": "scientific-benchmark", "status": "planned", "title": "Build representative benchmark and validation protocol before calibration"},
