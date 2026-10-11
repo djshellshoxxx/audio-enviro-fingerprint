@@ -2,7 +2,7 @@ name: Build beta
 
 on:
   push:
-    branches: ["main", "codex/audio-environment-beta"]
+    branches: ["main", "codex/audio-environment-beta", "claude/**"]
     tags: ["v*-beta*"]
   pull_request:
   workflow_dispatch:
@@ -16,6 +16,33 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest]
+        python: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install project
+        run: python -m pip install --upgrade pip && python -m pip install ".[formats]"
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+        env:
+          PYTHONPATH: src
+      - name: Headless CLI smoke test
+        run: |
+          python scripts/make_smoke_wav.py smoke.wav
+          python -m audio_enviro_fingerprint.cli analyze smoke.wav --out smoke-report.json
+          python -m audio_enviro_fingerprint.cli verify-report smoke-report.json --evidence smoke.wav
+        env:
+          PYTHONPATH: src
+
+  package:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -23,23 +50,37 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install project and builder
-        run: python -m pip install --upgrade pip && python -m pip install . pyinstaller
-      - name: Run tests
-        run: python -m unittest discover -s tests -v
-        env:
-          PYTHONPATH: src
-      - name: Build application bundle
-        run: pyinstaller --noconfirm --clean --windowed --name AudioEnvironmentFingerprinter --paths src run_app.py
-      - name: Smoke launch Linux GUI
-        if: runner.os == 'Linux'
-        run: xvfb-run -a ./dist/AudioEnvironmentFingerprinter/AudioEnvironmentFingerprinter
-        env:
-          AEFP_SMOKE_TEST: "1"
-      - name: Smoke launch Windows GUI
+        run: python -m pip install --upgrade pip && python -m pip install ".[formats]" pyinstaller
+      - name: Build application folder
+        run: python scripts/build_bundle.py
+      - name: Build Windows single-file executable
         if: runner.os == 'Windows'
-        run: .\dist\AudioEnvironmentFingerprinter\AudioEnvironmentFingerprinter.exe
-        env:
-          AEFP_SMOKE_TEST: "1"
+        run: python scripts/build_bundle.py --onefile
+      - name: Packaged smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          python scripts/make_smoke_wav.py smoke.wav
+          AEFP_SMOKE_TEST=1 AEFP_SMOKE_FILE=smoke.wav AEFP_SMOKE_REPORT=smoke-report.json \
+            xvfb-run -a ./dist/AudioEnvironmentFingerprinter/AudioEnvironmentFingerprinter
+          PYTHONPATH=src python -m audio_enviro_fingerprint.cli verify-report smoke-report.json --evidence smoke.wav
+      - name: Packaged smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python scripts/make_smoke_wav.py smoke.wav
+          $env:AEFP_SMOKE_TEST = "1"
+          $env:AEFP_SMOKE_FILE = (Resolve-Path smoke.wav).Path
+          foreach ($exe in @(".\dist\AudioEnvironmentFingerprinter\AudioEnvironmentFingerprinter.exe", ".\dist\AudioEnvironmentFingerprinter-standalone.exe")) {
+            $report = Join-Path (Get-Location) ("report-" + [IO.Path]::GetFileNameWithoutExtension($exe) + ".json")
+            $env:AEFP_SMOKE_REPORT = $report
+            # GUI-subsystem executables return immediately unless waited on explicitly.
+            $proc = Start-Process -FilePath $exe -Wait -PassThru
+            if ($proc.ExitCode -ne 0) { throw "$exe exited with $($proc.ExitCode)" }
+            if (-not (Test-Path $report)) { throw "$exe did not write a smoke report" }
+            $env:PYTHONPATH = "src"
+            python -m audio_enviro_fingerprint.cli verify-report $report --evidence smoke.wav
+            if ($LASTEXITCODE -ne 0) { throw "Report verification failed for $exe" }
+          }
       - name: Upload Linux beta
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
@@ -48,11 +89,19 @@ jobs:
           path: dist/AudioEnvironmentFingerprinter/
           if-no-files-found: error
           retention-days: 30
-      - name: Upload Windows beta
+      - name: Upload Windows beta folder
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: audio-enviro-fingerprint-windows-${{ github.sha }}
           path: dist/AudioEnvironmentFingerprinter/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Windows standalone executable
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-enviro-fingerprint-windows-standalone-${{ github.sha }}
+          path: dist/AudioEnvironmentFingerprinter-standalone.exe
           if-no-files-found: error
           retention-days: 30
