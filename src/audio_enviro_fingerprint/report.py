@@ -102,7 +102,7 @@ def report_digest(report: dict) -> str:
 
 def build_report(*, evidence_path, evidence_sha256: str, audio, analysis, fingerprint, transitions,
                  notes, markers=None, channel_summary=None, recurrences=None, application_version: str,
-                 created_at_utc: str | None = None) -> dict:
+                 settings: dict | None = None, created_at_utc: str | None = None) -> dict:
     if not isinstance(evidence_sha256, str) or len(evidence_sha256) != 64:
         raise ValueError("evidence_sha256 must be a 64-character hexadecimal SHA-256 digest")
     evidence_sha256 = evidence_sha256.lower()
@@ -114,6 +114,7 @@ def build_report(*, evidence_path, evidence_sha256: str, audio, analysis, finger
         "created_at_utc": created_at_utc or datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "evidence": {"source_path": str(evidence_path), "sha256": evidence_sha256},
         "audio": _audio_summary(audio),
+        "analysis_settings": to_plain(settings or {}),
         "analysis": _analysis_dict(analysis),
         "fingerprint": fingerprint_payload,
         "transitions": to_plain(list(transitions or [])),
