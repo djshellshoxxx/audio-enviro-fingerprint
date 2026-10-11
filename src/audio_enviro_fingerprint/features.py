@@ -3,11 +3,16 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import math
+from typing import Callable
 
 import numpy as np
 
 from .methods.noise import frame_level_summary, rms_dbfs
 from .methods.spectral import describe_spectrum
+
+
+class AnalysisCancelled(Exception):
+    """Raised when a caller-supplied cancel flag is set during analysis."""
 
 
 @dataclass(frozen=True)
@@ -35,7 +40,14 @@ class AnalysisResult:
 
 
 def analyze_audio(samples: np.ndarray, sample_rate: int, frame_seconds: float = 2.0,
-                  hop_seconds: float = 1.0) -> AnalysisResult:
+                  hop_seconds: float = 1.0, progress: Callable[[float], object] | None = None,
+                  cancel=None) -> AnalysisResult:
+    """Extract framewise features.
+
+    ``progress`` (optional) receives non-decreasing fractions in [0, 1], ending with 1.0.
+    ``cancel`` (optional) is any object with ``is_set()`` (e.g. ``threading.Event``);
+    when set, :class:`AnalysisCancelled` is raised before the next frame.
+    """
     samples = np.asarray(samples, dtype=np.float64)
     if samples.ndim != 1 or sample_rate <= 0:
         raise ValueError("Expected mono samples and a positive sample rate")
@@ -43,14 +55,27 @@ def analyze_audio(samples: np.ndarray, sample_rate: int, frame_seconds: float = 
         raise ValueError("Frame and hop durations must be finite and positive")
     frame_size = max(2, round(frame_seconds * sample_rate))
     hop_size = max(1, round(hop_seconds * sample_rate))
+    starts = range(0, samples.size - frame_size + 1, hop_size) if samples.size >= frame_size else range(0)
+    total = len(starts)
+    report_every = max(1, total // 200)
+    if progress is not None:
+        progress(0.0)
     frames = []
-    if samples.size >= frame_size:
-        for start in range(0, samples.size - frame_size + 1, hop_size):
-            segment = samples[start:start + frame_size]
-            spectral = describe_spectrum(segment, sample_rate)
-            frames.append(FrameFeature(start / sample_rate, rms_dbfs(segment),
-                                       spectral["centroid_hz"], spectral["flatness"],
-                                       spectral["band_power_db"]))
+    for index, start in enumerate(starts):
+        if cancel is not None and cancel.is_set():
+            raise AnalysisCancelled("Analysis cancelled")
+        segment = samples[start:start + frame_size]
+        spectral = describe_spectrum(segment, sample_rate)
+        frames.append(FrameFeature(start / sample_rate, rms_dbfs(segment),
+                                   spectral["centroid_hz"], spectral["flatness"],
+                                   spectral["band_power_db"]))
+        if progress is not None and (index + 1) % report_every == 0 and index + 1 < total:
+            progress((index + 1) / total)
+    if cancel is not None and cancel.is_set():
+        raise AnalysisCancelled("Analysis cancelled")
     levels = [frame.rms_dbfs for frame in frames]
-    return AnalysisResult(sample_rate, len(samples) / sample_rate, frame_seconds,
-                          hop_seconds, frames, frame_level_summary(levels))
+    result = AnalysisResult(sample_rate, len(samples) / sample_rate, frame_seconds,
+                            hop_seconds, frames, frame_level_summary(levels))
+    if progress is not None:
+        progress(1.0)
+    return result
