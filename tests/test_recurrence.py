@@ -1,8 +1,11 @@
 import math
+import tempfile
 import unittest
+from pathlib import Path
 
 import numpy as np
 
+from audio_enviro_fingerprint.case_store import CaseStore
 from audio_enviro_fingerprint.features import analyze_audio
 from audio_enviro_fingerprint.recurrence import find_recurrences, segment_analysis
 
@@ -37,6 +40,19 @@ class RecurrenceTests(unittest.TestCase):
         segments = self._segments([220, 1800], "a") + self._segments([3200, 1800], "b")
         pairs = {(m.first.segment_id, m.second.segment_id) for m in find_recurrences(segments)}
         self.assertEqual(pairs, {("a#2", "b#2")})
+
+    def test_persists_run_parameters_and_findings(self):
+        findings = [m.to_dict() for m in find_recurrences(self._segments([220, 1800, 220]))]
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp, "a.wav")
+            source.write_bytes(b"evidence")
+            with CaseStore(Path(tmp, "case.db")) as store:
+                evidence_id = store.register_evidence(source)
+                store.save_recurrence_run(evidence_id, {"max_distance": 0.25}, findings)
+                runs = store.recurrence_runs_for(evidence_id)
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0]["parameters"], {"max_distance": 0.25})
+        self.assertEqual(runs[0]["findings"][0]["first"]["segment_id"], "rec#1")
 
     def test_rejects_invalid_threshold(self):
         with self.assertRaises(ValueError):

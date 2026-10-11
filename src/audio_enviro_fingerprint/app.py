@@ -14,6 +14,7 @@ from .comparison import compare_fingerprints
 from .features import analyze_audio
 from .fingerprint import make_fingerprint
 from .integrity import sha256_file
+from .recurrence import find_recurrences, segment_analysis
 from .transitions import detect_transitions
 
 
@@ -29,6 +30,7 @@ class FingerprinterApp(tk.Tk):
         self.analysis = None
         self.fingerprint = None
         self.evidence_id = None
+        self.recurrence_findings = []
         self.evidence_sha256 = None
         db_dir = Path.home() / ".audio-enviro-fingerprint"
         self.store = CaseStore(db_dir / "cases.sqlite3")
@@ -78,6 +80,13 @@ class FingerprinterApp(tk.Tk):
             self.transitions.heading(col, text=title)
             self.transitions.column(col, width=width, anchor="w")
         self.transitions.pack(fill="x")
+        ttk.Label(analysis_tab, text="Recurring environment candidates (unvalidated)", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(14, 4))
+        self.recurrences = ttk.Treeview(analysis_tab, columns=("first", "second", "distance", "drivers"), show="headings", height=4)
+        for col, title, width in (("first", "Segment A (s)", 140), ("second", "Segment B (s)", 140),
+                                  ("distance", "Feature distance", 130), ("drivers", "Largest differences", 480)):
+            self.recurrences.heading(col, text=title)
+            self.recurrences.column(col, width=width, anchor="w")
+        self.recurrences.pack(fill="x")
         ttk.Label(analysis_tab, text="Median fingerprint features", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(14, 4))
         self.features = ttk.Treeview(analysis_tab, columns=("feature", "value"), show="headings", height=8)
         self.features.heading("feature", text="Feature")
@@ -143,7 +152,15 @@ class FingerprinterApp(tk.Tk):
     def _show_results(self):
         for item in self.transitions.get_children(): self.transitions.delete(item)
         for item in self.features.get_children(): self.features.delete(item)
+        for item in self.recurrences.get_children(): self.recurrences.delete(item)
         events = detect_transitions(self.analysis)
+        self.recurrence_findings = self._run_recurrence()
+        for match in self.recurrence_findings:
+            drivers = sorted(match.differences.items(), key=lambda item: item[1]["normalized_delta"], reverse=True)[:3]
+            self.recurrences.insert("", "end", values=(
+                f"{match.first.start_seconds:.1f}–{match.first.end_seconds:.1f}",
+                f"{match.second.start_seconds:.1f}–{match.second.end_seconds:.1f}", f"{match.distance:.3f}",
+                ", ".join(f"{key} {item['delta']:+.2f}" for key, item in drivers)))
         for event in events:
             evidence = ", ".join(f"{key} {value:+.2f}" for key, value in event.evidence.items())
             self.transitions.insert("", "end", values=(f"{event.timestamp_seconds:.2f}", f"{event.strength:.3f}", evidence))
@@ -194,6 +211,17 @@ class FingerprinterApp(tk.Tk):
         except Exception as exc:
             messagebox.showerror("Comparison failed", str(exc))
 
+    RECURRENCE_PARAMETERS = {"transition_threshold": 0.35, "minimum_separation_seconds": 3.0,
+                             "minimum_frames": 2, "max_distance": 0.25}
+
+    def _run_recurrence(self):
+        params = self.RECURRENCE_PARAMETERS
+        segments = segment_analysis(self.analysis, f"evidence-{self.evidence_id}", params["transition_threshold"],
+                                    params["minimum_separation_seconds"], params["minimum_frames"])
+        findings = find_recurrences(segments, params["max_distance"])
+        self.store.save_recurrence_run(self.evidence_id, params, [match.to_dict() for match in findings])
+        return findings
+
     def export_json(self):
         if not self.analysis:
             messagebox.showinfo("Load evidence", "Open a WAV file before exporting.")
@@ -209,8 +237,11 @@ class FingerprinterApp(tk.Tk):
                   "analysis": self.analysis.to_dict(), "fingerprint": json.loads(self.fingerprint.canonical_json),
                   "fingerprint_sha256": self.fingerprint.fingerprint_hash,
                   "transitions": [event.__dict__ for event in detect_transitions(self.analysis)],
+                  "recurrence_candidates": [match.to_dict() for match in self.recurrence_findings],
+                  "recurrence_parameters": self.RECURRENCE_PARAMETERS,
                   "notes": self.store.notes_for(self.evidence_id),
                   "limitations": ["PCM WAV only", "Transition scores are candidates requiring review",
+                                  "Recurrence candidates use an unvalidated threshold and require examiner review",
                                   "Fingerprint score is not location probability", "RT60 requires a separate measured impulse response"]}
         try:
             Path(target).write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")

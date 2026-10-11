@@ -7,7 +7,7 @@ Results are screening candidates only; they do not establish a common location.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import math
 import statistics
 
@@ -36,6 +36,10 @@ class Recurrence:
     distance: float
     differences: dict[str, dict[str, float]]
     explanation: str
+
+    def to_dict(self) -> dict:
+        return {"first": asdict(self.first), "second": asdict(self.second), "distance": self.distance,
+                "differences": self.differences, "explanation": self.explanation}
 
 
 def segment_analysis(analysis, recording_id: str = "recording", transition_threshold: float = 0.35,

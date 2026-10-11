@@ -1,6 +1,7 @@
 """Small SQLite store for evidence references and timestamped analyst notes."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sqlite3
 from datetime import datetime, timezone
@@ -29,6 +30,13 @@ class CaseStore:
                 timestamp_seconds REAL NOT NULL CHECK(timestamp_seconds >= 0),
                 title TEXT NOT NULL,
                 body TEXT NOT NULL,
+                created_utc TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS recurrence_runs (
+                id INTEGER PRIMARY KEY,
+                evidence_id INTEGER NOT NULL REFERENCES evidence(id),
+                parameters_json TEXT NOT NULL,
+                findings_json TEXT NOT NULL,
                 created_utc TEXT NOT NULL
             );
         """)
@@ -71,6 +79,24 @@ class CaseStore:
             ORDER BY n.timestamp_seconds,n.id
         """, (evidence_id,)).fetchall()
         return [dict(row) for row in rows]
+
+    def save_recurrence_run(self, evidence_id: int, parameters: dict, findings: list[dict]) -> int:
+        """Append an immutable record of one recurrence screening run and its parameters."""
+        self.evidence_record(evidence_id)
+        created = datetime.now(timezone.utc).isoformat()
+        cursor = self.connection.execute(
+            "INSERT INTO recurrence_runs(evidence_id,parameters_json,findings_json,created_utc) VALUES(?,?,?,?)",
+            (evidence_id, json.dumps(parameters, sort_keys=True, allow_nan=False),
+             json.dumps(findings, sort_keys=True, allow_nan=False), created))
+        self.connection.commit()
+        return int(cursor.lastrowid)
+
+    def recurrence_runs_for(self, evidence_id: int) -> list[dict]:
+        rows = self.connection.execute(
+            "SELECT * FROM recurrence_runs WHERE evidence_id=? ORDER BY id", (evidence_id,)).fetchall()
+        return [{"id": row["id"], "evidence_id": row["evidence_id"], "created_utc": row["created_utc"],
+                 "parameters": json.loads(row["parameters_json"]), "findings": json.loads(row["findings_json"])}
+                for row in rows]
 
     def close(self) -> None:
         self.connection.close()
