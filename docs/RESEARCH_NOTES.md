@@ -38,8 +38,10 @@ NIST's 2025 validation guidance emphasizes collecting and using validation data 
 | Adjacent-frame transition candidates | Implemented | Synthetic step-change test; threshold is a heuristic, no forensic sensitivity/specificity study. |
 | Fingerprint comparison | Implemented | Transparent feature differences; displayed score is uncalibrated and is not a likelihood ratio or probability. |
 | Schroeder decay slope | Experimental isolated routine | Requires a suitable impulse response; synthetic regression test only; not an ISO 3382 workflow. |
-| Acoustic recurrence within/across recordings | Deferred | Needs segmentation, calibrated matching, recurrence decision rules, and representative validation data. |
-| Controlled known-location exemplars | Deferred | Requires a documented acquisition protocol, session metadata, repeat samples, and location governance. |
+| Acoustic recurrence within/across recordings | Implemented (beta) | Segment medians and transparent distance; threshold unvalidated; synthetic benchmark only. |
+| Controlled known-location exemplars | Implemented (beta) | Protocol, metadata, quality grading and ranking implemented; location labels are self-reported and rankings are not identification. |
+| Inter-channel statistics | Implemented (beta) | Descriptive RMS/peak/DC, Pearson correlation and level difference; no localization. |
+| Compressed/float input | Implemented (beta) | libsndfile decode with provenance; lossy codecs alter features and are flagged. |
 | ENF, scene classification, event recognition, spatial analysis, device confounders | Deferred | Each needs an independent research dossier, implementation, validation record, and result view. |
 
 ## Source register

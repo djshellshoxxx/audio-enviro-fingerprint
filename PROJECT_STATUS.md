@@ -2,38 +2,44 @@
 
 ## Current phase
 
-Initial beta implementation and platform packaging. Repository was empty at start; this branch bootstraps the application.
+Feature-complete research beta `0.2.0-beta.1`. All backlog items in `tasks.json` are implemented to beta level. Scientific validation on representative real-world data has not been done (see "Scientific validation status").
 
-## Verified locally
+## Implemented and verified locally (Linux, Python 3.12, Xvfb)
 
-- PCM WAV integer decoding for supported format widths; analysis uses channel 1.
-- SHA-256 for source bytes and versioned canonical acoustic features are separate.
-- Framewise RMS, spectral centroid, flatness, and fixed-band power descriptors.
-- Candidate transitions with visible per-feature deltas.
-- Version-checked, explainable whole-recording fingerprint comparison.
-- Experimental Schroeder decay-slope estimator for impulse responses.
-- Timestamped SQLite notes bound to the source SHA-256.
-- Tk desktop interface and JSON report export.
-- Linux source-level test suite: 15 tests passed in the last completed run; rerun after final audit.
+- Input: PCM/float/extensible WAV (built in), FLAC/AIFF/OGG/MP3/RF64/W64 via optional soundfile. Decoder provenance and lossy flag recorded.
+- Multichannel: all channels retained, any channel selectable, descriptive inter-channel statistics.
+- Separate SHA-256 evidence hash and versioned `aefp-1` acoustic fingerprint. The hash is re-checked after decode and at export.
+- Framewise RMS, centroid, flatness and band descriptors, with background analysis, progress and cancellation.
+- Transition candidates with per-feature deltas. Manual markers with reasoned edits, soft delete and revision history.
+- Environment recurrence within and across recordings, with saved runs.
+- Explainable comparison: per-feature deltas, contribution shares and group summary.
+- Known-location reference acquisition: metadata form, checklist, grading and caveated ranking.
+- Case database schema v2 with in-place migration from the 0.1 schema.
+- `aefp-report-2` export with hash manifest and verifier (GUI and CLI).
+- Headless CLI (`aefp analyze | compare | verify-report | benchmark`).
+- Deterministic synthetic benchmark.
+- Test suite: 59 tests passing, including end-to-end GUI workflow tests under Xvfb.
+- Linux PyInstaller bundle built and smoke-tested locally with WAV and FLAC input.
+
+## Verified in CI only
+
+The Windows folder build and the Windows single-file executable can only be built and smoke-tested on the Windows runner. See the "Build beta" workflow runs for this branch.
 
 ## Scientific validation status
 
-Not forensically validated. Tests currently use synthetic signals and basic integrity cases. Comparison score and transition threshold are heuristic. No location attribution, authenticity conclusion, ENF, learned classifier, controlled reference acquisition, or recurrence analysis is implemented.
+Not forensically validated. The synthetic benchmark shows that gain/AGC and band-limiting confound comparisons, and that default thresholds are untuned (transition F1 ≈ 0.6 on synthetic data). The comparison score is descriptive and not calibrated. No location attribution, authenticity conclusion, ENF analysis or learned classifier is provided. The real-data protocol is in `docs/BENCHMARK_PROTOCOL.md`.
 
-## Beta limitations
+## Known limitations
 
-- PCM WAV only; no compressed audio or RF64.
-- Only channel 1 is analyzed.
-- Full WAV is decoded into memory.
-- Tk GUI has not been interactively exercised in this headless environment.
-- Windows executable can only be built and smoke-tested on Windows CI/host.
-- Known-location acquisition and environment recurrence detection remain TODO.
+- Whole-file in-memory decode. Very long recordings need proportional RAM.
+- Analysis uses one selected channel at a time. Spatial statistics are descriptive.
+- Reports have a hash manifest but are not digitally signed. There is no multi-user access control or encryption.
+- Executables are unsigned.
+- Accessibility (screen reader) review has not been done.
 
 ## Next milestones
 
-1. Finish source audit, edge-case QA, and test suite.
-2. Run separate Windows/Linux CI package builds and inspect artifacts.
-3. Add or repair features based on CI, then verify launch behavior on both platforms.
-4. Develop representative acoustic benchmark protocol and data before treating any score as evidence.
-5. Implement the three requested distinctive future features with separate specifications and validation records.
-
+1. Acquire the representative validation dataset and run the preregistered protocol.
+2. Calibrate (or replace) thresholds and the descriptive score from that data.
+3. Streaming decode for long recordings; signed report manifests.
+4. Additional independent methods from `docs/FUTURE_FEATURES.md`, each with its own validation record.

@@ -32,3 +32,18 @@ These are software regression tests. They are not scientific validation on repre
 
 Only automated unit tests and the source build are locally testable in the current workspace. Native Windows launch and GUI interaction require the CI runner or a Windows test machine. The CI smoke test validates window construction and startup, not human usability or end-to-end interaction with a recording.
 
+
+## Additions in 0.2.0-beta.1
+
+Automated tests (59) additionally cover the following:
+
+- 8/16/24/32-bit PCM, float and extensible WAV, channel selection and invalid channels, FLAC through soundfile, the lossy flag, and progress/cancellation (`test_audio_io.py`).
+- Inter-channel statistics (`test_channels.py`).
+- Schema migration from 0.1 databases, marker revision/deletion history, the fingerprint hash check, reference round-trip, and non-finite rejection (`test_case_store.py`).
+- Reference validation, grading and ranking with version-mismatch skipping (`test_reference.py`).
+- Pipeline, report tamper detection (report, fingerprint and evidence), comparison contributions, CLI exit codes, and benchmark determinism (`test_report_cli.py`).
+- An end-to-end GUI workflow under Xvfb: load, channel switch, compare, cross-recording recurrence, markers, notes, reference registration and ranking, export and verify, cancel, and bad input (`test_app_gui.py`).
+
+Packaged smoke tests analyze a WAV and verify the written report, on Linux (folder) and Windows (folder and single-file exe). The packaged Linux app was also verified locally with FLAC input.
+
+The synthetic benchmark (`aefp benchmark`) is a software sanity check, not validation. See `BENCHMARK_PROTOCOL.md` for the real-data protocol, which remains outstanding.

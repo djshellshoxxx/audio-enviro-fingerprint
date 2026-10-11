@@ -64,3 +64,14 @@ The Analysis view exposes evidence hash, acoustic fingerprint hash, candidate ti
 
 Each scientific method belongs in its own module, has a documented input/output contract, independent tests, a validation record, and visible result values. Modules consume decoded data and do not rewrite evidence. Reuse in another application is limited to `integrity.py`, `audio_io.py`, `methods/*`, `features.py`, `fingerprint.py`, `comparison.py`, and `transitions.py`; preserve each module's version and caveats when migrating.
 
+
+## Additions in 0.2.0-beta.1
+
+- **Input and channels:** `load_audio(path, channel)` (see `AUDIO_INPUT.md`) retains all channels and selects one. `methods/channels.py` gives descriptive inter-channel statistics. Decoder provenance is carried into reports.
+- **Pipeline:** `pipeline.analyze_file` hashes, decodes, analyzes, fingerprints, detects transitions, segments, finds recurrences and re-hashes. The GUI and CLI share it. `analyze_audio` accepts `progress` and `cancel`.
+- **Case database schema 2:** `schema_version`, `fingerprints`, `reference_recordings`, `markers` and `marker_revisions` (append-only history, a reason required for edit and delete), and `recurrence_runs`. Databases from 0.1 are migrated in place.
+- **Comparison:** `Comparison` also carries `contributions` (share of squared distance), `groups` and `distance`. `score = exp(-distance)` is unchanged.
+- **Reports:** schema `aefp-report-2` adds `audio` (with decoder), `analysis_settings`, `channel_summary`, `markers` (including deleted, with reasons), `recurrences` and `manifest` (`report_sha256` over the canonical JSON without the manifest, `fingerprint_sha256`, `evidence_sha256`). `verify_report` recomputes all three. The manifest is not a signature.
+- **References:** `reference.py`, see `REFERENCE_ACQUISITION.md`.
+- **Benchmark and CLI:** `benchmark.py` (synthetic, see `BENCHMARK_PROTOCOL.md`) and `cli.py` (`aefp`).
+- **UI:** background jobs with progress and cancel. Analysis, Channels, Recurrence, Markers, Examiner Notes, Compare and References tabs. Report verification dialog.
