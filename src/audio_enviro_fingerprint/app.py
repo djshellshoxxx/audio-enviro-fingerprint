@@ -154,7 +154,11 @@ class FingerprinterApp(tk.Tk):
         for item in self.features.get_children(): self.features.delete(item)
         for item in self.recurrences.get_children(): self.recurrences.delete(item)
         events = detect_transitions(self.analysis)
-        self.recurrence_findings = self._run_recurrence()
+        try:
+            self.recurrence_findings = self._run_recurrence()
+        except Exception as exc:
+            self.recurrence_findings = []
+            messagebox.showerror("Recurrence screening failed", str(exc))
         for match in self.recurrence_findings:
             drivers = sorted(match.differences.items(), key=lambda item: item[1]["normalized_delta"], reverse=True)[:3]
             self.recurrences.insert("", "end", values=(

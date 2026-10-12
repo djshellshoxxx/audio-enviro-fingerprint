@@ -50,11 +50,16 @@ def segment_analysis(analysis, recording_id: str = "recording", transition_thres
     frames = list(getattr(analysis, "frames", []))
     boundaries = [event.timestamp_seconds for event in
                   detect_transitions(analysis, transition_threshold, minimum_separation_seconds)]
+    frame_seconds = analysis.frame_seconds
     groups: list[list] = [[]]
+    pending = list(boundaries)
     for frame in frames:
-        if boundaries and frame.start_seconds >= boundaries[0]:
-            boundaries.pop(0)
+        if pending and frame.start_seconds >= pending[0]:
+            pending.pop(0)
             groups.append([])
+        # Overlapping frames that straddle a transition mix both environments.
+        if any(frame.start_seconds < b < frame.start_seconds + frame_seconds for b in boundaries):
+            continue
         groups[-1].append(frame)
     segments = []
     for group in groups:

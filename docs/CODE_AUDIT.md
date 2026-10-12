@@ -28,3 +28,18 @@ Scope: initial beta source, tests, storage, analysis math, and packaging workflo
 
 Local Linux checks: 15 unit tests passed; `compileall` passed; package wheel built. Native PyInstaller builds and GUI startup smoke tests run on separate Windows/Linux CI runners because PyInstaller is unavailable locally and outbound package access is blocked.
 
+
+## Follow-up audit (recurrence beta)
+
+Fixed:
+- Recurrence segments included overlapping frames that straddle a transition, blending both environments into each segment's medians. Straddling frames are now excluded.
+- A failure while saving recurrence results escaped the GUI callback after the view was partly updated; it is now reported and the rest of the analysis still displays.
+- Note timestamps accepted `inf`/`NaN` at the store layer; they now must be finite.
+
+Open (not fixed, documented):
+- "Compare recording" does not hash, register, or export the second file, so comparisons leave no auditable record.
+- Feature normalization scales use the first item's centroid, so comparison and recurrence distances are slightly asymmetric (A→B ≠ B→A).
+- Recurrence runs are appended to the case store on every open, including re-opens of the same evidence.
+- Python 3.10/3.11 `wave` rejects WAVE_FORMAT_EXTENSIBLE files (common for 24-bit/multichannel); they fail with an explicit error. Python 3.12+ reads them.
+- CI only triggers on `main`, the beta branch, tags, and pull requests; other branches have no build/smoke run until a PR is opened.
+- Analysis remains synchronous and whole-file in memory (unchanged from the beta audit).
