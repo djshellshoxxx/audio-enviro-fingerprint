@@ -40,6 +40,7 @@ jobs:
           python scripts/make_smoke_wav.py smoke.wav
           python -m audio_enviro_fingerprint.cli analyze smoke.wav --out smoke-report.json
           python -m audio_enviro_fingerprint.cli verify-report smoke-report.json --evidence smoke.wav
+          python scripts/check_smoke_report.py smoke-report.json
         env:
           PYTHONPATH: src
 
@@ -69,6 +70,7 @@ jobs:
           AEFP_SMOKE_TEST=1 AEFP_SMOKE_FILE=smoke.wav AEFP_SMOKE_REPORT=smoke-report.json \
             xvfb-run -a ./dist/AudioEnvironmentFingerprinter/AudioEnvironmentFingerprinter
           PYTHONPATH=src python -m audio_enviro_fingerprint.cli verify-report smoke-report.json --evidence smoke.wav
+          python scripts/check_smoke_report.py smoke-report.json
       - name: Packaged smoke test (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -86,6 +88,8 @@ jobs:
             $env:PYTHONPATH = "src"
             python -m audio_enviro_fingerprint.cli verify-report $report --evidence smoke.wav
             if ($LASTEXITCODE -ne 0) { throw "Report verification failed for $exe" }
+            python scripts/check_smoke_report.py $report
+            if ($LASTEXITCODE -ne 0) { throw "Fingerprint not reproducible for $exe" }
           }
       - name: Upload Linux beta
         if: runner.os == 'Linux'

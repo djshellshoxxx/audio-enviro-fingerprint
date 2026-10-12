@@ -20,7 +20,6 @@ def describe_spectrum(samples: np.ndarray, sample_rate: int) -> dict:
         spectrum[1:] *= 2.0
     frequencies = np.fft.rfftfreq(samples.size, 1 / sample_rate)
     total = float(spectrum.sum())
-    magnitude = np.sqrt(spectrum)
     centroid = float(np.sum(frequencies * spectrum) / total) if total else 0.0
     positive = spectrum[spectrum > 1e-24]
     flatness = float(np.exp(np.mean(np.log(positive))) / np.mean(positive)) if positive.size else 0.0

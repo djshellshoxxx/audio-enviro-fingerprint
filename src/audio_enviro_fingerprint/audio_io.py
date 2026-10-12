@@ -109,7 +109,9 @@ def _finish(audio: np.ndarray, rate: int, width: int, channel: int, decoder: dic
         decoder.setdefault("notes", []).append("Float samples exceed full scale (|x| > 1.0); values kept unclipped.")
     # Averaging channels can cancel out-of-phase content. One channel is selected
     # deterministically; all channels are retained and the original file is untouched.
-    return AudioData(audio[:, channel].copy(), int(rate), channels, int(width), audio,
+    # A mono column is already contiguous; copying it would double peak memory for long files.
+    selected = audio[:, channel] if channels == 1 else audio[:, channel].copy()
+    return AudioData(selected, int(rate), channels, int(width), audio,
                      int(channel), decoder)
 
 

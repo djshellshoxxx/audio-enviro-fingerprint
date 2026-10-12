@@ -40,7 +40,7 @@ flowchart LR
 
 ### Fingerprint and comparison
 
-Fingerprint schema `aefp-1` contains median spectral/noise features, band powers, sample rate, duration, and frame count. Canonical JSON uses sorted keys, compact separators, and finite numbers. SHA-256 over that canonical feature record identifies this fingerprint version. Algorithm or serialization changes require a new version.
+Fingerprint schema `aefp-2` contains median spectral/noise features, band powers, sample rate, duration, and frame count. Float values are rounded to 6 decimal places, with -0.0 normalized, so that floating-point differences between platforms and NumPy builds do not change the hash. `aefp-1` hashed unrounded values and gave different hashes for the same file on Windows and Linux. A value within ~1e-10 of a rounding boundary can still differ, and that shows up as a hash mismatch. Canonical JSON uses sorted keys, compact separators, and finite numbers. SHA-256 over that canonical feature record identifies this fingerprint version. Algorithm or serialization changes require a new version.
 
 The comparison returns named raw differences and a bounded descriptive score derived from normalized feature deltas. Normalizers are implementation constants, not calibrated forensic scales. The interface must preserve raw deltas and state that the score is neither a probability nor a likelihood ratio. Version mismatches are rejected.
 

@@ -32,18 +32,23 @@ def describe_channels(channel_data: np.ndarray, sample_rate: int) -> dict:
         per_channel.append({"channel": index, "rms_dbfs": level,
                             "peak_dbfs": dbfs(float(np.max(np.abs(column)))),
                             "dc_offset": float(np.mean(column))})
-    centered = data - data.mean(axis=0)
-    norms = np.sqrt(np.sum(centered * centered, axis=0))
+    # Columns are centered one at a time so long multichannel files are not copied whole.
+    means = data.mean(axis=0)
+
+    def centered(index):
+        return data[:, index] - means[index]
+
+    norms = [float(np.sqrt(np.dot(column, column))) for column in map(centered, range(count))]
     correlation = [[0.0] * count for _ in range(count)]
     for i in range(count):
-        for j in range(i, count):
-            if norms[i] == 0.0 or norms[j] == 0.0:
-                value = 0.0
-            elif i == j:
-                value = 1.0
-            else:
-                value = float(np.clip(np.dot(centered[:, i], centered[:, j]) / (norms[i] * norms[j]), -1.0, 1.0))
-            correlation[i][j] = correlation[j][i] = value
+        if norms[i] == 0.0:
+            continue
+        correlation[i][i] = 1.0
+        column_i = centered(i) if count > 1 else None
+        for j in range(i + 1, count):
+            if norms[j] != 0.0:
+                value = float(np.clip(np.dot(column_i, centered(j)) / (norms[i] * norms[j]), -1.0, 1.0))
+                correlation[i][j] = correlation[j][i] = value
     differences = {f"{i + 1}-{j + 1}": float(levels[i] - levels[j])
                    for i in range(count) for j in range(i + 1, count)}
     notes = ["Descriptive channel statistics only; they do not localize sources or identify a location.",

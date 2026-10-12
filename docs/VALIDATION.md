@@ -35,7 +35,7 @@ Only automated unit tests and the source build are locally testable in the curre
 
 ## Additions in 0.2.0-beta.1
 
-Automated tests (59) additionally cover the following:
+Automated tests (61) additionally cover the following:
 
 - 8/16/24/32-bit PCM, float and extensible WAV, channel selection and invalid channels, FLAC through soundfile, the lossy flag, and progress/cancellation (`test_audio_io.py`).
 - Inter-channel statistics (`test_channels.py`).
@@ -45,5 +45,7 @@ Automated tests (59) additionally cover the following:
 - An end-to-end GUI workflow under Xvfb: load, channel switch, compare, cross-recording recurrence, markers, notes, reference registration and ranking, export and verify, cancel, and bad input (`test_app_gui.py`).
 
 Packaged smoke tests analyze a WAV and verify the written report, on Linux (folder) and Windows (folder and single-file exe). The packaged Linux app was also verified locally with FLAC input.
+
+Cross-platform reproducibility: CI asserts one expected `aefp-2` fingerprint hash for the smoke WAV on every OS and Python version, and from every packaged binary.
 
 The synthetic benchmark (`aefp benchmark`) is a software sanity check, not validation. See `BENCHMARK_PROTOCOL.md` for the real-data protocol, which remains outstanding.

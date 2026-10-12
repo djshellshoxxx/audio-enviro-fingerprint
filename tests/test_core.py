@@ -129,8 +129,22 @@ class FeatureTests(unittest.TestCase):
         first = make_fingerprint(analysis)
         second = make_fingerprint(analysis)
         self.assertEqual(first.fingerprint_hash, second.fingerprint_hash)
-        self.assertEqual(first.version, "aefp-1")
-        self.assertEqual(json.loads(first.canonical_json)["version"], "aefp-1")
+        self.assertEqual(first.version, "aefp-2")
+        self.assertEqual(json.loads(first.canonical_json)["version"], "aefp-2")
+
+    def test_fingerprint_hash_ignores_last_bit_platform_noise(self):
+        import dataclasses
+        import numpy as np
+
+        signal = np.sin(2 * math.pi * 300 * np.arange(16000) / 8000) * 0.1
+        analysis = analyze_audio(signal, 8000)
+        # Simulate another platform's FFT/log rounding: relative error ~1e-14.
+        noisy_frames = [dataclasses.replace(
+            f, rms_dbfs=f.rms_dbfs * (1 + 1e-14), spectral_centroid_hz=f.spectral_centroid_hz * (1 - 1e-14),
+            band_power_db={k: v * (1 + 1e-14) for k, v in f.band_power_db.items()}) for f in analysis.frames]
+        noisy = dataclasses.replace(analysis, frames=noisy_frames,
+                                    noise={k: v * (1 + 1e-14) for k, v in analysis.noise.items()})
+        self.assertEqual(make_fingerprint(analysis).fingerprint_hash, make_fingerprint(noisy).fingerprint_hash)
 
 
 class ReverberationTests(unittest.TestCase):

@@ -1,6 +1,5 @@
 """Drives the Tk workstation end to end with dialogs stubbed. Skipped without Tk or a display."""
 import math
-import os
 import tempfile
 import unittest
 import wave
@@ -91,6 +90,8 @@ class AppWorkflowTests(unittest.TestCase):
         self.assertEqual(len(app.extra_bundles), 1)
         app.save_recurrence_run()
         self.assertEqual(len(app.store.recurrence_runs()), 1)
+        self.assertEqual(len(app.run_table.get_children()), 1)
+        self.assertEqual(len(app.case_table.get_children()), 1)
 
         with mock.patch.object(self.module.simpledialog, "askfloat", return_value=3.0), \
                 mock.patch.object(self.module.simpledialog, "askstring", side_effect=["Door", "Door (edit)", "refined"]):
@@ -128,6 +129,30 @@ class AppWorkflowTests(unittest.TestCase):
         from audio_enviro_fingerprint.report import verify_report
         self.assertTrue(verify_report(target, evidence_path=self.other)["ok"])
         self.assertEqual(self.errors, [])
+
+    def test_rt60_on_impulse_response(self):
+        rate = 8000
+        t = np.arange(rate * 3) / rate
+        impulse = 10 ** (-60 * t / (20 * 0.8)) * np.random.default_rng(1).normal(0, 0.2, len(t))
+        path = self.dir / "ir.wav"
+        with wave.open(str(path), "wb") as out:
+            out.setnchannels(1)
+            out.setsampwidth(2)
+            out.setframerate(rate)
+            out.writeframes((np.clip(impulse, -1, 1) * 32767).astype("<i2").tobytes())
+        self.app.load_path(path)
+        self._wait()
+        with mock.patch.object(self.module.messagebox, "askyesno", return_value=True):
+            self.app.estimate_rt60()
+        import re
+        estimate = float(re.search(r"RT60 ≈ ([0-9.]+) s", self.app.rt60_label.cget("text")).group(1))
+        self.assertAlmostEqual(estimate, 0.8, delta=0.1)
+        from audio_enviro_fingerprint.cli import main
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(main(["rt60", str(path)]), 0)
+        self.assertIn("RT60", out.getvalue())
 
     def test_cancel_keeps_previous_results_and_bad_file_reports_error(self):
         app = self.app

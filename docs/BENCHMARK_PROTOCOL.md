@@ -29,7 +29,7 @@ Example quick-mode result (seed 0): same vs. different room AUC 0.998, falling t
 ### Procedure
 
 1. Preregister hypotheses, metrics, thresholds to be evaluated, and the train/test split by *location* (no location in both).
-2. Freeze the algorithm version (`aefp-1` fingerprint, transition and recurrence code) before scoring the test set.
+2. Freeze the algorithm version (`aefp-2` fingerprint, transition and recurrence code) before scoring the test set.
 3. Report ROC/DET curves, AUC with confidence intervals (bootstrap by location), and false-positive rates at candidate thresholds, per device and per confounder.
 4. Assess calibration only within a defined evaluative framework (e.g. likelihood ratios with Cllr). Until then the score stays descriptive.
 5. Publish the dataset manifest (hashes), code version and results. Any algorithm change requires re-validation and a new version tag.

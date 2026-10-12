@@ -11,7 +11,9 @@ import sys
 
 from . import __version__
 from .benchmark import format_summary, run_benchmark
+from .audio_io import load_audio
 from .comparison import compare_fingerprints
+from .methods.reverberation import estimate_t20
 from .pipeline import DEFAULT_SETTINGS, analyze_file, bundle_report
 from .report import verify_report, write_report
 
@@ -87,6 +89,20 @@ def _verify(args) -> int:
     return 0 if result["ok"] else 1
 
 
+def _rt60(args) -> int:
+    audio = load_audio(args.impulse_response, args.channel)
+    result = estimate_t20(audio.samples, audio.sample_rate)
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True, allow_nan=False))
+    else:
+        print(f"RT60 (T20 extrapolation): {result['rt60_seconds']:.3f} s; decay slope "
+              f"{result['decay_slope_db_per_second']:.1f} dB/s over {result['range_db']:.1f} dB; "
+              f"fit RMSE {result['fit_rmse_db']:.2f} dB ({result['method']})")
+    print("Experimental: valid only for a measured room impulse response; not an ISO 3382 measurement.",
+          file=sys.stderr)
+    return 0
+
+
 def _benchmark(args) -> int:
     result = run_benchmark(seed=args.seed, quick=args.quick)
     if args.json:
@@ -115,6 +131,11 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("report")
     verify.add_argument("--evidence", help="original evidence file to re-hash")
     verify.set_defaults(handler=_verify)
+    rt60 = commands.add_parser("rt60", help="experimental Schroeder T20 decay estimate from an impulse response")
+    rt60.add_argument("impulse_response")
+    rt60.add_argument("--channel", type=int, default=0)
+    rt60.add_argument("--json", action="store_true")
+    rt60.set_defaults(handler=_rt60)
     bench = commands.add_parser("benchmark", help="run the synthetic software benchmark")
     bench.add_argument("--quick", action="store_true")
     bench.add_argument("--seed", type=int, default=0)

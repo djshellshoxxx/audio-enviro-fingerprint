@@ -8,7 +8,7 @@ Feature-complete research beta `0.2.0-beta.1`. All backlog items in `tasks.json`
 
 - Input: PCM/float/extensible WAV (built in), FLAC/AIFF/OGG/MP3/RF64/W64 via optional soundfile. Decoder provenance and lossy flag recorded.
 - Multichannel: all channels retained, any channel selectable, descriptive inter-channel statistics.
-- Separate SHA-256 evidence hash and versioned `aefp-1` acoustic fingerprint. The hash is re-checked after decode and at export.
+- Separate SHA-256 evidence hash and versioned `aefp-2` acoustic fingerprint. The hash is re-checked after decode and at export.
 - Framewise RMS, centroid, flatness and band descriptors, with background analysis, progress and cancellation.
 - Transition candidates with per-feature deltas. Manual markers with reasoned edits, soft delete and revision history.
 - Environment recurrence within and across recordings, with saved runs.
@@ -18,7 +18,10 @@ Feature-complete research beta `0.2.0-beta.1`. All backlog items in `tasks.json`
 - `aefp-report-2` export with hash manifest and verifier (GUI and CLI).
 - Headless CLI (`aefp analyze | compare | verify-report | benchmark`).
 - Deterministic synthetic benchmark.
-- Test suite: 59 tests passing, including end-to-end GUI workflow tests under Xvfb.
+- Test suite: 61 tests passing, including end-to-end GUI workflow tests under Xvfb. The same suite passes on Python 3.10/3.12 for Windows and Linux in CI.
+- Fingerprint hash reproducible across OS, Python and NumPy builds (`aefp-2`; asserted in CI).
+- Experimental RT60 (`aefp rt60`, Analysis tab) and a Case tab listing evidence and saved runs.
+- Performance: a 30-minute 48 kHz mono WAV analyzes in ~15 s with ~1.4 GB peak memory.
 - Linux PyInstaller bundle built and smoke-tested locally with WAV and FLAC input.
 
 ## Verified in CI only
@@ -31,7 +34,7 @@ Not forensically validated. The synthetic benchmark shows that gain/AGC and band
 
 ## Known limitations
 
-- Whole-file in-memory decode. Very long recordings need proportional RAM.
+- Whole-file in-memory decode. Peak memory is about 8× the size of a 16-bit WAV, so very long recordings need proportional RAM.
 - Analysis uses one selected channel at a time. Spatial statistics are descriptive.
 - Reports have a hash manifest but are not digitally signed. There is no multi-user access control or encryption.
 - Executables are unsigned.

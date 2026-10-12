@@ -14,7 +14,9 @@ Cross-platform desktop research beta for reproducible, explainable acoustic-envi
 - **Evidence handling:** SHA-256 at import, re-checked after decoding and at export. Timestamped notes and markers bound to the evidence hash in SQLite.
 - **Reports:** `aefp-report-2` JSON with a hash manifest, plus a verifier in the GUI and CLI.
 - **Synthetic benchmark** and a validation protocol. See [docs/BENCHMARK_PROTOCOL.md](docs/BENCHMARK_PROTOCOL.md).
-- **Experimental** Schroeder decay-slope RT60 estimate for measured impulse responses. This is not an ISO 3382 workflow.
+- **Experimental** Schroeder decay-slope RT60 estimate for measured impulse responses (`aefp rt60`, or the Analysis tab). This is not an ISO 3382 workflow.
+- **Case view:** evidence records with note, marker, fingerprint and reference counts, plus saved recurrence runs.
+- **Reproducible fingerprints:** the `aefp-2` hash is identical across Windows and Linux and across NumPy versions (checked in CI).
 
 This software does not identify a physical location, estimate the probability of a common location, or establish authenticity. Its output requires examiner review. Thresholds and the similarity score have not been validated on representative forensic datasets.
 
@@ -38,6 +40,7 @@ aefp analyze recording.wav --out report.json  # headless CLI
 aefp verify-report report.json --evidence recording.wav
 aefp compare a.wav b.wav
 aefp benchmark --quick
+aefp rt60 impulse_response.wav                # experimental
 ```
 
 Case data is stored in `~/.audio-enviro-fingerprint/cases.sqlite3`. Set `AEFP_DATA_DIR` to override the location. Run the tests with:

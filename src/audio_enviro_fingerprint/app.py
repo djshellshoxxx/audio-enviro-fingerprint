@@ -5,7 +5,6 @@ window stays responsive and analysis can be cancelled.
 """
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 import queue
@@ -20,6 +19,7 @@ from .case_store import CaseStore
 from .comparison import compare_fingerprints
 from .features import AnalysisCancelled
 from .integrity import sha256_file
+from .methods.reverberation import estimate_t20
 from .pipeline import DEFAULT_SETTINGS, analyze_file, bundle_report
 from .recurrence import CONFOUNDERS, find_recurrences
 from .reference import CAPTURE_CHECKLIST, RANKING_CAVEAT, ReferenceMetadata, quality_review, rank_against_references
@@ -154,6 +154,7 @@ class FingerprinterApp(tk.Tk):
         self._build_notes_tab()
         self._build_compare_tab()
         self._build_references_tab()
+        self._build_case_tab()
         ttk.Label(outer, text="Screening aid only. Similarity does not identify a physical location.",
                   style="Sub.TLabel").pack(anchor="w", pady=(6, 0))
 
@@ -175,6 +176,12 @@ class FingerprinterApp(tk.Tk):
                                         ("evidence", "Measured changes", 800)), height=5)
         ttk.Label(tab, text="Median fingerprint features", style="Section.TLabel").pack(anchor="w", pady=(8, 2))
         self.features = _table(tab, (("feature", "Feature", 300), ("value", "Measured value", 300)), height=8)
+        rt_row = ttk.Frame(tab)
+        rt_row.pack(fill="x", pady=(6, 0))
+        ttk.Button(rt_row, text="Estimate RT60 (impulse response only)…", command=self.estimate_rt60).pack(side="left")
+        self.rt60_label = ttk.Label(rt_row, text="Experimental Schroeder T20; valid only if the loaded recording is a "
+                                                 "measured room impulse response. Not ISO 3382.", style="Sub.TLabel")
+        self.rt60_label.pack(side="left", padx=8)
 
     def _build_channels_tab(self):
         tab = self._tab("Channels")
@@ -254,6 +261,31 @@ class FingerprinterApp(tk.Tk):
         self.compare_table = _table(tab, (("feature", "Feature", 240), ("first", "Loaded", 110), ("second", "Other", 110),
                                           ("delta", "Δ", 100), ("norm", "Normalized Δ", 110),
                                           ("share", "Share of distance", 130)), height=12)
+
+    def _build_case_tab(self):
+        tab = self._tab("Case")
+        ttk.Label(tab, text=f"Case database: {self.store.path}", style="Sub.TLabel").pack(anchor="w")
+        ttk.Button(tab, text="Refresh", command=self._load_case).pack(anchor="w", pady=6)
+        ttk.Label(tab, text="Evidence records (one per path + SHA-256)", style="Section.TLabel").pack(anchor="w")
+        self.case_table = _table(tab, (("id", "ID", 50), ("path", "Source path", 420), ("sha", "SHA-256", 160),
+                                       ("seen", "First seen (UTC)", 190), ("counts", "Notes / markers / fingerprints / refs", 240)),
+                                 height=8)
+        ttk.Label(tab, text="Saved recurrence runs", style="Section.TLabel").pack(anchor="w", pady=(8, 2))
+        self.run_table = _table(tab, (("id", "Run", 50), ("created", "Created (UTC)", 200),
+                                      ("recordings", "Recordings", 520), ("count", "Candidates", 90)), height=5)
+        self._load_case()
+
+    def _load_case(self):
+        _clear(self.case_table)
+        _clear(self.run_table)
+        for row in self.store.evidence_list():
+            self.case_table.insert("", "end", values=(row["id"], row["source_path"], row["sha256"][:16] + "…",
+                                                      row["first_seen_utc"],
+                                                      f"{row['note_count']} / {row['marker_count']} / "
+                                                      f"{row['fingerprint_count']} / {row['reference_count']}"))
+        for run in self.store.recurrence_runs():
+            names = ", ".join(Path(r["path"]).name for r in run["parameters"].get("recordings", []))
+            self.run_table.insert("", "end", values=(run["run_id"], run["created_utc"], names, len(run["results"])))
 
     def _build_references_tab(self):
         tab = self._tab("References")
@@ -386,6 +418,7 @@ class FingerprinterApp(tk.Tk):
                                              f" · {decoder.get('container', '?')} / {decoder.get('encoding', '?')}{lossy}"
                                              + (f" · {notes}" if notes else ""))
         self._show_results()
+        self._load_case()
 
     def _channel_changed(self, _event=None):
         if self.bundle:
@@ -396,6 +429,24 @@ class FingerprinterApp(tk.Tk):
     def _reanalyze(self):
         if self.bundle:
             self.load_path(self.bundle.path, self.bundle.audio.selected_channel)
+
+    def estimate_rt60(self):
+        if not self.bundle:
+            messagebox.showinfo("Load evidence", "Open a measured impulse-response recording first.")
+            return
+        if not messagebox.askyesno("Impulse response required",
+                                   "RT60 estimation is only meaningful for a measured room impulse response "
+                                   "(e.g. a balloon pop or swept-sine deconvolution), not ordinary recordings. "
+                                   "Treat the loaded channel as an impulse response?"):
+            return
+        try:
+            result = estimate_t20(self.bundle.audio.samples, self.bundle.audio.sample_rate)
+        except ValueError as exc:
+            messagebox.showerror("RT60 not estimated", str(exc))
+            return
+        self.rt60_label.configure(text=f"RT60 ≈ {result['rt60_seconds']:.3f} s (T20, slope "
+                                       f"{result['decay_slope_db_per_second']:.1f} dB/s, fit RMSE "
+                                       f"{result['fit_rmse_db']:.2f} dB) — experimental, not ISO 3382.")
 
     # ------------------------------------------------------------- display
     def _show_results(self):
@@ -537,6 +588,7 @@ class FingerprinterApp(tk.Tk):
         run_id = self.store.save_recurrence_run({"settings": self.bundle.settings, "recordings": recordings,
                                                  "application_version": __version__},
                                                 to_plain(self._recurrences()))
+        self._load_case()
         messagebox.showinfo("Saved", f"Recurrence run {run_id} saved to the case database.")
 
     # ------------------------------------------------------------- markers
