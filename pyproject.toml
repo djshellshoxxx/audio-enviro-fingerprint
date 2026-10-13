@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audio-enviro-fingerprint"
+version = "0.1.0b1"
+description = "Explainable acoustic environment screening and evidence integrity workstation"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26,<3"]
+classifiers = ["Development Status :: 4 - Beta", "Operating System :: OS Independent",
+               "Programming Language :: Python :: 3"]
+
+[project.scripts]
+audio-enviro-fingerprint = "audio_enviro_fingerprint.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
