@@ -36,7 +36,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 
 ## Releases
 
-Pushing a tag such as `v0.2.0-beta.1` (must equal `__version__`) runs the Windows and Linux builds and attaches the Windows zip, Linux tar.gz and `SHA256SUMS.txt` to a GitHub pre-release.
+Pushing a tag such as `v0.2.0-beta.1` (must equal `__version__`), or running the workflow manually with `publish_release` ticked (the tag is created from `__version__`), runs the Windows and Linux builds and attaches the Windows zip, Linux tar.gz and `SHA256SUMS.txt` to a GitHub pre-release.
 
 ## Build
 

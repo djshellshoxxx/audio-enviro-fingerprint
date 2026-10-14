@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish a GitHub pre-release tagged from __version__ (creates the tag)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -73,17 +78,21 @@ jobs:
 
   release:
     # Milestone releases: push a tag like v0.2.0-beta.1 to publish the Windows (and Linux) builds.
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
     needs: test
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Check tag matches package version
+      - name: Resolve release tag from package version
+        id: ver
         run: |
           ver=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/audio_enviro_fingerprint/__init__.py)
-          [ "v$ver" = "${GITHUB_REF_NAME}" ] || { echo "Tag ${GITHUB_REF_NAME} != v$ver"; exit 1; }
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "v$ver" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} != v$ver"; exit 1
+          fi
+          echo "tag=v$ver" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           path: dl
@@ -91,11 +100,13 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir artifacts
-          cp dl/AudioEnvironmentFingerprinter-windows.zip "artifacts/AudioEnvironmentFingerprinter-windows-${GITHUB_REF_NAME}.zip"
-          cp dl/AudioEnvironmentFingerprinter-linux.tar.gz "artifacts/AudioEnvironmentFingerprinter-linux-${GITHUB_REF_NAME}.tar.gz"
+          cp dl/AudioEnvironmentFingerprinter-windows.zip "artifacts/AudioEnvironmentFingerprinter-windows-${{ steps.ver.outputs.tag }}.zip"
+          cp dl/AudioEnvironmentFingerprinter-linux.tar.gz "artifacts/AudioEnvironmentFingerprinter-linux-${{ steps.ver.outputs.tag }}.tar.gz"
           cd artifacts && sha256sum * > SHA256SUMS.txt && ls -l
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           prerelease: true
           generate_release_notes: true
           files: |
