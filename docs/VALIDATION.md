@@ -39,6 +39,6 @@ Only automated unit tests and the source build are locally testable in the curre
 |---|---|---|
 | Recurrence | Synthetic A-B-A positive; continuous, A-B and short-segment negatives; cross-recording match and negative control | Repeated passes through real rooms, similar-room negatives, ROC for 0.80/0.15, boundary accuracy against annotated transitions |
 | Explainable comparison | Contributions sum to 1, swap symmetry, identical=1.0, warnings | Feature-level reliability across devices/codecs; calibration only on representative data |
-| Reference acquisition | Field validation, immutability triggers, hash re-verification, quality flags | Usability trial of the form, protocol review by practitioners, signed manifests |
+| Reference acquisition | Field validation, hash chain with REPLACE/DROP TRIGGER tamper tests, hash re-verification, quality flags | Usability trial of the form, protocol review by practitioners, signed manifests |
 | Channel selection / cancellation | Channel pick and out-of-range rejection; cancel and progress tests | Very long files, memory limits, GUI cancellation under load |
 | GUI | Compile, import and CI launch smoke test only | Human walkthrough on Windows and Linux (tab behavior, dialogs, reference form, scrolling) |

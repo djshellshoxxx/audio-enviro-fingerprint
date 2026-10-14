@@ -28,3 +28,9 @@ Scope: initial beta source, tests, storage, analysis math, and packaging workflo
 
 Local Linux checks: 15 unit tests passed; `compileall` passed; package wheel built. Native PyInstaller builds and GUI startup smoke tests run on separate Windows/Linux CI runners because PyInstaller is unavailable locally and outbound package access is blocked.
 
+
+## Audit 2 (0.2.0-beta.1)
+
+Independent review of the 0.2 changes. Fixed: reference "immutability" bypass (`INSERT OR REPLACE`, `DROP TRIGGER`, `DROP TABLE`) replaced by a hash chain with honest wording; sample-rate warning corrected; warnings carried into recurrence candidates; boundary frames now excluded; recurrence consolidated to each segment's best earlier match with unique recording IDs enforced; unusable intervening segments reported; comparison inputs recorded with path/SHA-256/channel and bound to the loaded channel; stale comparison UI cleared on new load; startup no longer fails on a damaged reference table; NaN note timestamps rejected; stricter reference field types; 8-bit clipping and tiny-file quality checks; transition strength terms capped; report records parameters and only compared references plus the chain head; Windows smoke test now fails on non-zero exit; Linux release asset is a tar.gz that keeps the executable bit; release tag must equal `__version__`.
+
+Known and not fixed: full-file decode memory (no streaming); comparison fingerprinting still runs on the UI thread; reference file is hashed and decoded in separate reads; flatness uses an absolute power cutoff; vendored `skills/` tree is unrelated to the product; no human GUI walkthrough yet; Tk theme details (checkbox hover colors) unverified.

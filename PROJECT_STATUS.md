@@ -6,7 +6,7 @@
 
 ## Verified locally (Linux, headless)
 
-- 31 automated tests pass (core integrity/decode/features/transitions plus recurrence A-B-A, continuous and A-B negatives, cross-recording match/negative control, comparison symmetry and contribution sums, reference validation, immutability triggers, hash re-verification, quality review, channel selection, cancellation, report serialization).
+- 42 automated tests pass (core integrity/decode/features/transitions plus recurrence A-B-A, continuous and A-B negatives, cross-recording match/negative control, comparison symmetry and contribution sums, reference validation, immutability triggers, hash re-verification, quality review, channel selection, cancellation, report serialization).
 - The Tk GUI cannot run locally (no Tk in this container). It is built and smoke-launched on Windows and Linux CI only; interactive use has not been exercised by a human.
 
 ## Scientific validation status
@@ -18,7 +18,9 @@ Not forensically validated. All thresholds (transition 0.35, recurrence match 0.
 - PCM WAV only (no compressed audio, no RF64); full file decoded into memory.
 - One channel analyzed at a time.
 - Recurrence boundaries are uncertain by about one analysis window.
-- Reference metadata is self-reported; the software cannot verify it.
+- Reference metadata is self-reported; the software cannot verify it. Reference records are hash-chained (tamper-evident), not tamper-proof.
+- Cross-recording recurrence is API/report only; the GUI analyzes one recording.
+- WAVE_FORMAT_EXTENSIBLE WAVs need Python 3.12+.
 - No signed manifests, encryption or multi-user access control.
 
 ## Not implemented (needs data or external validation)

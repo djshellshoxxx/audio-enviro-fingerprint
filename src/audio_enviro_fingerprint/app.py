@@ -1,6 +1,7 @@
 """Tk desktop workstation for the beta analysis workflow."""
 from __future__ import annotations
 
+import math
 import os
 from pathlib import Path
 import queue
@@ -45,7 +46,10 @@ class FingerprinterApp(tk.Tk):
         db_dir = Path.home() / ".audio-enviro-fingerprint"
         self.store = CaseStore(db_dir / "cases.sqlite3")
         self._build_ui()
-        self._load_references()
+        try:
+            self._load_references()
+        except Exception as exc:  # a damaged reference table must not stop the app from launching
+            messagebox.showwarning("Reference list unavailable", f"Stored references could not be read: {exc}")
         self.protocol("WM_DELETE_WINDOW", self._close)
 
     # ---------------------------------------------------------------- layout
@@ -119,12 +123,12 @@ class FingerprinterApp(tk.Tk):
     def _build_recurrence_tab(self):
         tab = ttk.Frame(self.notebook, padding=12)
         self.notebook.add(tab, text="Recurrence")
-        ttk.Label(tab, text="Segments split at candidate transitions; segments with fewer than 2 complete frames "
-                  "are not matched.", style="Sub.TLabel").pack(anchor="w")
+        ttk.Label(tab, text="Segments split at candidate transitions; segments with fewer than 2 unmixed frames "
+                  "are not matched. Cross-recording search is available through the Python API and report only.", style="Sub.TLabel").pack(anchor="w")
         self.segment_view = self._tree(tab, (("id", "Segment", 120), ("span", "Span (s)", 150),
                                              ("frames", "Frames", 70), ("usable", "Used", 60),
                                              ("note", "Note", 400)), 6)
-        ttk.Label(tab, text="Recurrence candidates (environment departs, then returns)",
+        ttk.Label(tab, text="Recurrence candidates (descriptors depart, then return; review required)",
                   font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(12, 4))
         self.recur_view = self._tree(tab, (("pair", "Segments", 220), ("score", "Descriptive score", 130),
                                            ("gap", "Gap (s)", 80), ("closest", "Closest features", 420),
@@ -150,7 +154,7 @@ class FingerprinterApp(tk.Tk):
     def _build_reference_tab(self):
         tab = ttk.Frame(self.notebook, padding=12)
         self.notebook.add(tab, text="Reference acquisition")
-        ttk.Label(tab, text="Known-location exemplars. Records are immutable and bound to the file SHA-256. "
+        ttk.Label(tab, text="Known-location exemplars. Records are append-only, hash-chained and bound to the file SHA-256 (edits are detectable, not impossible). "
                   "The location label is the operator's claim, not a verified fact.",
                   style="Sub.TLabel", wraplength=1050).pack(anchor="w")
         canvas = tk.Canvas(tab, height=250, background="#111827", highlightthickness=0)
@@ -180,7 +184,7 @@ class FingerprinterApp(tk.Tk):
         buttons = ttk.Frame(tab)
         buttons.pack(fill="x", pady=6)
         ttk.Button(buttons, text="Save reference from WAV…", command=self.save_reference).pack(side="left")
-        ttk.Button(buttons, text="Verify selected", command=self.verify_reference).pack(side="left", padx=8)
+        ttk.Button(buttons, text="Verify selected + chain", command=self.verify_reference).pack(side="left", padx=8)
         ttk.Button(buttons, text="Compare loaded recording to selected", command=self.compare_to_reference).pack(side="left")
         self.ref_view = self._tree(tab, (("id", "ID", 50), ("loc", "Location", 220), ("when", "Acquired", 200),
                                          ("quality", "Quality", 80), ("sha", "File SHA-256", 520)), 5, True)
@@ -281,10 +285,16 @@ class FingerprinterApp(tk.Tk):
         self.current_path, self.audio, self.analysis = Path(path), audio, analysis
         self.fingerprint, self.evidence_id, self.evidence_sha256 = fingerprint, evidence_id, digest
         self.comparisons = []
+        self.compare_view.delete(*self.compare_view.get_children())
+        self.compare_text.delete("1.0", "end")
+        self.compare_summary.configure(text="Use “Compare recording…” or compare to a stored reference.")
         self.file_label.configure(text=f"{self.current_path.name} · {audio.duration_seconds:.2f} s · "
                                        f"{audio.sample_rate} Hz · channel {audio.channel_index + 1} of {audio.channels}")
         self.hash_label.configure(text=f"Evidence SHA-256: {digest}\nAcoustic fingerprint aefp-1: {fingerprint.fingerprint_hash}")
-        self._show_results()
+        try:
+            self._show_results()
+        except Exception as exc:
+            messagebox.showerror("Unable to display results", str(exc))
         self._load_notes()
 
     def _show_results(self):
@@ -304,7 +314,7 @@ class FingerprinterApp(tk.Tk):
                 self.features.insert("", "end", values=(key, f"{value:.4f}{unit}"))
             else:
                 self.features.insert("", "end", values=(key, value))
-        self.segments = segment_recording(self.analysis, self.events)
+        self.segments = segment_recording(self.analysis, self.events, "rec1")
         for seg in self.segments:
             self.segment_view.insert("", "end", values=(seg.segment_id, f"{seg.start_seconds:.1f}–{seg.end_seconds:.1f}",
                                                         seg.frame_count, "yes" if seg.usable else "no", seg.note))
@@ -355,10 +365,15 @@ class FingerprinterApp(tk.Tk):
 
     # ------------------------------------------------------------ comparison
     def _fingerprint_of(self, path, channel=0):
+        digest = sha256_file(path)
         other = load_wav(path, channel)
-        return make_fingerprint(analyze_audio(other.samples, other.sample_rate))
+        fingerprint = make_fingerprint(analyze_audio(other.samples, other.sample_rate))
+        if sha256_file(path) != digest:
+            raise ValueError("The comparison file changed while it was being read.")
+        return fingerprint, digest
 
-    def _show_comparison(self, other_fp, label, reference=None):
+    def _show_comparison(self, other, label, path, channel, reference=None):
+        other_fp, digest = other
         comparison = compare_fingerprints({"version": self.fingerprint.version, "features": self.fingerprint.features},
                                           {"version": other_fp.version, "features": other_fp.features})
         self.compare_view.delete(*self.compare_view.get_children())
@@ -371,10 +386,14 @@ class FingerprinterApp(tk.Tk):
         text += [f"WARNING: {w}" for w in comparison.warnings]
         if reference:
             text.append(caveat(reference["metadata"]))
+            if reference["quality"]["overall"] != "pass":
+                text.append(f"WARNING: reference quality review was '{reference['quality']['overall']}'.")
         self.compare_summary.configure(text=f"{self.current_path.name} vs {label} — descriptive score {comparison.score:.3f} (not a probability)")
         self.compare_text.delete("1.0", "end")
         self.compare_text.insert("end", "\n".join(text))
-        self.comparisons.append({"other": label, "reference_id": reference["id"] if reference else None, **comparison.to_dict()})
+        self.comparisons.append({"other": label, "other_path": str(path), "other_sha256": digest,
+                                 "other_channel": channel + 1, "loaded_sha256": self.evidence_sha256,
+                                 "reference_id": reference["id"] if reference else None, **comparison.to_dict()})
         self.notebook.select(2)
 
     def compare_file(self):
@@ -385,7 +404,8 @@ class FingerprinterApp(tk.Tk):
         if not path:
             return
         try:
-            self._show_comparison(self._fingerprint_of(path, int(self.channel_var.get()) - 1), Path(path).name)
+            channel = self.audio.channel_index
+            self._show_comparison(self._fingerprint_of(path, channel), Path(path).name, path, channel)
         except Exception as exc:
             messagebox.showerror("Comparison failed", str(exc))
 
@@ -403,7 +423,9 @@ class FingerprinterApp(tk.Tk):
             if not (check["source_hash_matches"] and check["metadata_hash_matches"]):
                 raise ValueError("Reference file or metadata no longer matches its recorded hash; refusing to compare.")
             record = self.store.reference_record(ref_id)
-            self._show_comparison(self._fingerprint_of(record["source_path"]), f"reference {ref_id}", record)
+            channel = self.audio.channel_index
+            self._show_comparison(self._fingerprint_of(record["source_path"], channel), f"reference {ref_id}",
+                                  record["source_path"], channel, record)
         except Exception as exc:
             messagebox.showerror("Comparison failed", str(exc))
 
@@ -421,7 +443,8 @@ class FingerprinterApp(tk.Tk):
             return
         try:
             metadata = {key: entry.get() for key, entry in self.ref_entries.items()}
-            metadata["checklist_confirmed"] = all(v.get() for v in self.checklist_vars) or bool(metadata.get("deviations", "").strip())
+            metadata["checklist_confirmed"] = all(v.get() for v in self.checklist_vars) or (
+                len(metadata.get("deviations", "").strip()) >= 20)
             problems = validate_reference_metadata(metadata)
             if problems:
                 raise ValueError("\n".join(problems))
@@ -436,7 +459,7 @@ class FingerprinterApp(tk.Tk):
                 return
             ref_id = self.store.add_reference(path, metadata, quality)
             self._load_references()
-            messagebox.showinfo("Reference stored", f"Reference {ref_id} stored (immutable). Quality: {quality['overall']}\n\n{summary}")
+            messagebox.showinfo("Reference stored", f"Reference {ref_id} stored (hash-chained). Quality: {quality['overall']}\n\n{summary}")
         except Exception as exc:
             messagebox.showerror("Unable to store reference", str(exc))
 
@@ -446,9 +469,11 @@ class FingerprinterApp(tk.Tk):
             return
         ref_id = int(self.ref_view.item(selected[0], "values")[0])
         result = self.store.verify_reference(ref_id)
-        ok = result["source_hash_matches"] and result["metadata_hash_matches"]
+        chain = self.store.verify_reference_chain()
+        result["chain"] = chain["intact"]
+        ok = result["source_hash_matches"] and result["metadata_hash_matches"] and chain["intact"]
         (messagebox.showinfo if ok else messagebox.showerror)("Reference verification",
-            f"Source file hash matches: {result['source_hash_matches']}\nMetadata hash matches: {result['metadata_hash_matches']}")
+            f"Source file hash matches: {result['source_hash_matches']}\nMetadata hash matches: {result['metadata_hash_matches']}\nReference hash chain intact: {chain['intact']} {chain['bad_row_ids'] or ''}")
 
     # ---------------------------------------------------------------- export
     def export_json(self):
@@ -468,8 +493,10 @@ class FingerprinterApp(tk.Tk):
                                   analysis=self.analysis, fingerprint=self.fingerprint,
                                   notes=self.store.notes_for(self.evidence_id),
                                   references=[{k: r[k] for k in ("id", "source_sha256", "metadata_sha256", "metadata", "quality")}
-                                              for r in self.store.list_references()],
-                                  comparisons=self.comparisons)
+                                              for r in self.store.list_references()
+                                              if r["id"] in {c["reference_id"] for c in self.comparisons}],
+                                  comparisons=self.comparisons,
+                                  reference_chain_head=self.store.reference_chain_head())
             Path(target).write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
             messagebox.showinfo("Export complete", f"Report written to {target}")
         except Exception as exc:
@@ -482,6 +509,8 @@ class FingerprinterApp(tk.Tk):
             return
         try:
             timestamp = float(self.note_time.get())
+            if not math.isfinite(timestamp):
+                raise ValueError("Timestamp must be a finite number")
             if self.audio and timestamp > self.audio.duration_seconds:
                 raise ValueError("Timestamp is beyond the recording duration")
             self.store.add_note(self.evidence_id, timestamp, self.note_title.get(), self.note_body.get("1.0", "end"))

@@ -47,7 +47,7 @@ def aba():
 class RecurrenceTests(unittest.TestCase):
     def test_detects_return_to_first_environment(self):
         analysis = analyze_audio(aba(), SR)
-        segs = segment_recording(analysis, detect_transitions(analysis))
+        segs = segment_recording(analysis, detect_transitions(analysis), "rec1")
         found = find_recurrences(segs)
         self.assertTrue(found, "A-B-A recording must yield a recurrence candidate")
         top = found[0]
@@ -59,13 +59,13 @@ class RecurrenceTests(unittest.TestCase):
     def test_continuous_environment_is_not_recurrence(self):
         x = room(1, 60, -1.0, 0.05)
         analysis = analyze_audio(x, SR)
-        segs = segment_recording(analysis, detect_transitions(analysis))
+        segs = segment_recording(analysis, detect_transitions(analysis), "rec1")
         self.assertEqual(find_recurrences(segs), [])
 
     def test_a_then_b_only_has_no_recurrence(self):
         x = np.concatenate([room(1, 30, -1.0, 0.05), room(2, 30, 1.5, 0.05)])
         analysis = analyze_audio(x, SR)
-        segs = segment_recording(analysis, detect_transitions(analysis))
+        segs = segment_recording(analysis, detect_transitions(analysis), "rec1")
         self.assertEqual(find_recurrences(segs), [])
 
     def test_cross_recording_match_and_negative_control(self):
@@ -80,7 +80,7 @@ class RecurrenceTests(unittest.TestCase):
 
     def test_short_segments_are_not_matched(self):
         analysis = analyze_audio(room(1, 2.5, -1.0, 0.05), SR)
-        segs = segment_recording(analysis, [])
+        segs = segment_recording(analysis, [], "rec1")
         self.assertFalse(segs[0].usable)
 
     def test_invalid_thresholds_rejected(self):
@@ -190,6 +190,96 @@ class ReportTests(unittest.TestCase):
         text = json.dumps(r, allow_nan=False)
         self.assertEqual(json.loads(text)["schema_version"], "aefp-report-2")
         self.assertTrue(r["recurrence"]["candidates"])
+
+
+class AuditRegressionTests(unittest.TestCase):
+    def test_reference_tamper_is_detected_by_chain(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as tmp:
+            wav = Path(tmp) / "ref.wav"
+            write_wav(wav, [room(1, 40, -1.0, 0.05)])
+            audio = load_wav(wav)
+            q = review_quality(audio.samples, audio.sample_rate)
+            with CaseStore(Path(tmp) / "c.sqlite") as store:
+                a = store.add_reference(wav, GOOD, q)
+                store.add_reference(wav, dict(GOOD, location_identifier="y"), q)
+                self.assertTrue(store.verify_reference_chain()["intact"])
+                head = store.reference_chain_head()
+                with self.assertRaises(sqlite3.DatabaseError):
+                    store.connection.execute("INSERT OR REPLACE INTO reference_exemplars(id,source_path,source_sha256,"
+                                             "metadata_json,metadata_sha256,quality_json,created_utc) "
+                                             "VALUES(?,?,?,?,?,?,?)", (a, "x", "x", "{}", "x", "{}", "x"))
+                store.connection.execute("DROP TRIGGER reference_no_update")
+                store.connection.execute("UPDATE reference_exemplars SET source_path='forged' WHERE id=?", (a,))
+                chain = store.verify_reference_chain()
+                self.assertFalse(chain["intact"])
+                self.assertEqual(chain["bad_row_ids"], [a])
+                self.assertEqual(head, store.reference_chain_head())
+
+    def test_duplicate_recording_ids_rejected(self):
+        a = analyze_audio(room(1, 30, -1.0, 0.05), SR)
+        s = segment_recording(a, [], "same") + segment_recording(a, [], "same")
+        with self.assertRaises(ValueError):
+            find_recurrences(s)
+        with self.assertRaises(ValueError):
+            segment_recording(a, [], "")
+
+    def test_boundary_excludes_mixed_frames(self):
+        x = np.concatenate([room(1, 20, -1.0, 0.05), room(2, 20, 1.5, 0.05)])
+        analysis = analyze_audio(x, SR)
+        segs = segment_recording(analysis, detect_transitions(analysis), "r")
+        self.assertEqual(len(segs), 2)
+        self.assertLessEqual(segs[0].frame_count, 19)  # frame [19,21] straddles the true change at 20 s
+        self.assertLessEqual(segs[1].frame_count, 19)
+
+    def test_consolidation_limits_candidates(self):
+        x = np.concatenate([room(1 + i, 12, -1.0 if i % 2 == 0 else 1.5, 0.05) for i in range(12)])
+        analysis = analyze_audio(x, SR)
+        segs = segment_recording(analysis, detect_transitions(analysis), "r")
+        found = find_recurrences(segs)
+        self.assertLessEqual(len(found), len(segs))
+        self.assertEqual(len({c.second_segment for c in found}), len(found))
+
+    def test_cross_recording_candidate_carries_warnings(self):
+        a1 = analyze_audio(room(1, 30, -1.0, 0.05), SR)
+        a2 = analyze_audio(room(7, 30, -1.0, 0.05), SR)
+        hits = find_recurrences(segment_recording(a1, [], "r1") + segment_recording(a2, [], "r2"))
+        self.assertIsInstance(hits[0].to_dict()["warnings"], list)
+
+    def test_reference_type_validation(self):
+        self.assertTrue(validate_reference_metadata(dict(GOOD, sample_rate_hz=True)))
+        self.assertTrue(validate_reference_metadata(dict(GOOD, location_identifier=["a"])))
+        self.assertTrue(validate_reference_metadata(dict(GOOD, acquisition_datetime=20260101)))
+
+    def test_8bit_clipping_and_tiny_files(self):
+        self.assertEqual(review_quality(np.full(SR, 127 / 128), SR)["overall"], "fail")
+        self.assertEqual(review_quality(np.zeros(10), SR)["overall"], "fail")
+
+    def test_transition_strength_is_capped(self):
+        x = np.concatenate([np.zeros(10 * SR), room(1, 10, -1.0, 0.3)])
+        analysis = analyze_audio(x, SR)
+        for t in detect_transitions(analysis):
+            self.assertLess(t.strength, 4.0 + 1e-9)
+
+    def test_version_matches_pyproject(self):
+        import re
+        from audio_enviro_fingerprint import __version__
+        text = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text()
+        py = re.search(r'version = "([^"]+)"', text).group(1)
+        self.assertEqual(py.replace("b", "-beta."), __version__)
+
+    def test_report_includes_parameters_and_chain_head(self):
+        analysis = analyze_audio(aba(), SR)
+        r = build_report(source_path="x.wav", sha256="0" * 64, channel_index=0, channel_count=1, analysis=analysis,
+                         fingerprint=make_fingerprint(analysis), notes=[], reference_chain_head="abc")
+        self.assertEqual(r["reference_chain_head"], "abc")
+        self.assertEqual(r["parameters"]["transition_threshold"], 0.35)
+
+    def test_nan_rejected_in_report(self):
+        analysis = analyze_audio(aba(), SR)
+        with self.assertRaises(ValueError):
+            build_report(source_path="x", sha256="0", channel_index=0, channel_count=1, analysis=analysis,
+                         fingerprint=make_fingerprint(analysis), notes=[], comparisons=[{"x": float("nan")}])
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import numpy as np
 
 from .noise import dbfs
 
-CLIP_LEVEL = 0.999
+CLIP_LEVEL = 0.991  # 8-bit positive full scale decodes to 127/128 = 0.992
 MIN_REFERENCE_SECONDS = 30.0
 MIN_SAMPLE_RATE = 16000
 
@@ -20,6 +20,8 @@ def review_quality(samples: np.ndarray, sample_rate: int) -> dict:
     frame = max(1, sample_rate // 10)
     n = x.size // frame
     silent = 0.0
+    if x.size < frame:
+        silent = float(20 * np.log10(max(float(np.sqrt(np.mean(x ** 2))), 1e-12)) < -70.0)
     if n:
         levels = 20 * np.log10(np.maximum(np.sqrt(np.mean(x[:n * frame].reshape(n, frame) ** 2, axis=1)), 1e-12))
         silent = float(np.mean(levels < -70.0))

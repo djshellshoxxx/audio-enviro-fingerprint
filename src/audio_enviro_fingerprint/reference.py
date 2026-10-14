@@ -53,10 +53,13 @@ CHECKLIST = (
 def validate_reference_metadata(metadata: dict) -> list[str]:
     """Return a list of problems; empty means the record may be stored."""
     problems = []
+    numeric = ("sample_rate_hz", "height_m")
     for key, label in REQUIRED_FIELDS.items():
         value = metadata.get(key)
         if value is None or (isinstance(value, str) and not value.strip()):
             problems.append(f"Missing required field: {label}")
+        elif key not in numeric and not isinstance(value, str):
+            problems.append(f"{key} must be text")
     when = metadata.get("acquisition_datetime")
     if isinstance(when, str) and when.strip():
         try:
@@ -68,6 +71,8 @@ def validate_reference_metadata(metadata: dict) -> list[str]:
         if value in (None, ""):
             continue
         try:
+            if isinstance(value, bool):
+                raise ValueError
             number = float(value)
             if not math.isfinite(number) or number <= 0:
                 raise ValueError

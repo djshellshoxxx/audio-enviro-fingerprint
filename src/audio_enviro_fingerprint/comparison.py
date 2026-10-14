@@ -82,7 +82,8 @@ def compare_fingerprints(first: dict, second: dict) -> Comparison:
     warnings = []
     if a.get("sample_rate_hz") != b.get("sample_rate_hz"):
         warnings.append(f"Sample rates differ ({a.get('sample_rate_hz')} vs {b.get('sample_rate_hz')} Hz); "
-                        "bands above the lower Nyquist frequency are not comparable.")
+                        "spectral centroid and flatness span 0 to Nyquist and are not comparable, and fixed "
+                        "bands above the lower Nyquist frequency are empty. Resample to a common rate first.")
     level = differences.get("median_rms_dbfs")
     if level and abs(level["delta"]) >= LEVEL_CONFOUNDER_DB:
         warnings.append(f"Median level differs by {level['delta']:+.1f} dB; microphone gain, distance or AGC "

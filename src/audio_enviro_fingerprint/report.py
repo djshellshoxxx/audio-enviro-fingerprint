@@ -18,9 +18,9 @@ LIMITATIONS = ["PCM WAV only", "Only the selected channel is analyzed",
 
 def build_report(*, source_path: str, sha256: str, channel_index: int, channel_count: int, analysis,
                  fingerprint, notes: list[dict], references: list[dict] | None = None,
-                 comparisons: list[dict] | None = None) -> dict:
+                 comparisons: list[dict] | None = None, reference_chain_head: str = "") -> dict:
     transitions = detect_transitions(analysis)
-    segments = segment_recording(analysis, transitions)
+    segments = segment_recording(analysis, transitions, "rec1")
     candidates = find_recurrences(segments, analysis.frame_seconds)
     report = {
         "schema_version": SCHEMA, "application_version": __version__,
@@ -33,7 +33,10 @@ def build_report(*, source_path: str, sha256: str, channel_index: int, channel_c
         "segments": [s.__dict__ for s in segments],
         "recurrence": {"candidates": [c.to_dict() for c in candidates],
                        "rationale": THRESHOLD_RATIONALE, "confounders": list(CONFOUNDERS)},
+        "parameters": {"transition_threshold": 0.35, "transition_min_separation_seconds": 3.0,
+                       "frame_seconds": analysis.frame_seconds, "hop_seconds": analysis.hop_seconds},
         "comparisons": comparisons or [], "references": references or [],
+        "reference_chain_head": reference_chain_head,
         "notes": notes, "limitations": LIMITATIONS,
     }
     json.dumps(report, allow_nan=False)  # fail loudly on non-finite values
