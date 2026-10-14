@@ -14,6 +14,7 @@ class AudioData:
     sample_rate: int
     channels: int
     source_width_bytes: int
+    channel_index: int = 0
 
     @property
     def duration_seconds(self) -> float:
@@ -38,8 +39,8 @@ def _decode_pcm(raw: bytes, width: int) -> np.ndarray:
     raise ValueError(f"Unsupported PCM sample width: {width * 8}-bit")
 
 
-def load_wav(path: str | Path) -> AudioData:
-    """Read integer PCM WAV and analyze channel 1 without destructive downmixing."""
+def load_wav(path: str | Path, channel: int = 0) -> AudioData:
+    """Read integer PCM WAV and analyze one zero-based channel without downmixing."""
     try:
         with wave.open(str(path), "rb") as source:
             if source.getcomptype() != "NONE":
@@ -61,6 +62,8 @@ def load_wav(path: str | Path) -> AudioData:
         raise ValueError("WAV data ends in a partial channel frame")
     audio = scalar.reshape(-1, channels)
     # Averaging channels can cancel out-of-phase content. Channel 1 is selected
-    # deterministically; the original multichannel file remains untouched.
-    return AudioData(audio[:, 0], rate, channels, width)
+    # explicitly (default 1); the original multichannel file remains untouched.
+    if not 0 <= channel < channels:
+        raise ValueError(f"Channel {channel + 1} is not available; file has {channels} channel(s)")
+    return AudioData(audio[:, channel], rate, channels, width, channel)
 

@@ -1,10 +1,10 @@
 # Future feature backlog
 
-All ideas here are unimplemented unless explicitly marked otherwise. Prioritize scientific validation and provenance before adding learned classification.
+All ideas here are unimplemented unless explicitly marked otherwise. Items 1-3 below were implemented in 0.2.0-beta.1 (heuristic, unvalidated); their remaining validation work is listed in VALIDATION.md. Prioritize scientific validation and provenance before adding learned classification.
 
 ## Three distinctive features requested for this project
 
-1. **Environment recurrence detection** — identify when an environment segment disappears and later returns within a recording or across recordings. Store segment IDs, matching features, threshold rationale, confounders, and uncertainty. Validate on repeated passes through known rooms and negative controls. The current beta compares whole-recording summaries only; it does not establish recurrence.
+1. **Environment recurrence detection** — identify when an environment segment disappears and later returns within a recording or across recordings. Store segment IDs, matching features, threshold rationale, confounders, and uncertainty. Validate on repeated passes through known rooms and negative controls. Implemented in 0.2 as heuristic candidates only (no GUI cross-recording search yet); it does not establish recurrence.
 2. **Explainable fingerprint comparisons** — expose exactly which spectral, noise, reverberant, and other measurable characteristics drive similarities/differences. Preserve raw measurements and per-feature contributions. The beta has a preliminary version for spectral/noise features; complete it as each independent method is implemented, and do not collapse evidence into an opaque score.
 3. **Known-location reference acquisition** — guided exemplar capture documenting location identifier, date/time, recorder/microphone make/model/serial, input chain, channel, sample rate, placement, orientation, height, source signal, environmental occupancy/activity, weather when relevant, calibration, operator, repeats, and deviations. Add controlled capture checklist, consent/authority fields, immutable source hashes, and reference-quality review. Never claim a match solely from a self-reported location label.
 

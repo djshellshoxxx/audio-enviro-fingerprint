@@ -34,10 +34,11 @@ def detect_transitions(analysis, threshold: float = 0.35,
             band_deltas[name] = delta
             evidence[f"band_power_db.{name}"] = delta
         # Median normalized changes keep one narrow-band feature from dominating.
-        parts = [abs(evidence["rms_dbfs"]) / scales["rms_dbfs"],
-                 abs(evidence["spectral_centroid_hz"]) / scales["spectral_centroid_hz"],
-                 abs(evidence["spectral_flatness"]) / scales["spectral_flatness"]]
-        parts.extend(abs(delta) / 15.0 for delta in band_deltas.values())
+        # Each term is capped at 4 (as in comparison.py) so silence/dropouts cannot dominate selection.
+        parts = [min(abs(evidence["rms_dbfs"]) / scales["rms_dbfs"], 4.0),
+                 min(abs(evidence["spectral_centroid_hz"]) / scales["spectral_centroid_hz"], 4.0),
+                 min(abs(evidence["spectral_flatness"]) / scales["spectral_flatness"], 4.0)]
+        parts.extend(min(abs(delta) / 15.0, 4.0) for delta in band_deltas.values())
         strength = sum(parts) / len(parts)
         if strength >= threshold:
             candidates.append(Transition(after.start_seconds, float(strength), evidence))

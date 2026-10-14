@@ -2,38 +2,27 @@
 
 ## Current phase
 
-Initial beta implementation and platform packaging. Repository was empty at start; this branch bootstraps the application.
+0.2.0-beta.1: the three requested distinctive features (recurrence detection, explainable comparison, reference acquisition) are implemented on top of the 0.1 beta core, plus channel selection and cancellable background analysis.
 
-## Verified locally
+## Verified locally (Linux, headless)
 
-- PCM WAV integer decoding for supported format widths; analysis uses channel 1.
-- SHA-256 for source bytes and versioned canonical acoustic features are separate.
-- Framewise RMS, spectral centroid, flatness, and fixed-band power descriptors.
-- Candidate transitions with visible per-feature deltas.
-- Version-checked, explainable whole-recording fingerprint comparison.
-- Experimental Schroeder decay-slope estimator for impulse responses.
-- Timestamped SQLite notes bound to the source SHA-256.
-- Tk desktop interface and JSON report export.
-- Linux source-level test suite: 15 tests passed in the last completed run; rerun after final audit.
+- 42 automated tests pass (core integrity/decode/features/transitions plus recurrence A-B-A, continuous and A-B negatives, cross-recording match/negative control, comparison symmetry and contribution sums, reference validation, immutability triggers, hash re-verification, quality review, channel selection, cancellation, report serialization).
+- The Tk GUI cannot run locally (no Tk in this container). It is built and smoke-launched on Windows and Linux CI only; interactive use has not been exercised by a human.
 
 ## Scientific validation status
 
-Not forensically validated. Tests currently use synthetic signals and basic integrity cases. Comparison score and transition threshold are heuristic. No location attribution, authenticity conclusion, ENF, learned classifier, controlled reference acquisition, or recurrence analysis is implemented.
+Not forensically validated. All thresholds (transition 0.35, recurrence match 0.80 / departure margin 0.15, quality limits) are heuristic and tested only on synthetic noise. Scores are descriptive, not probabilities. No location attribution or authenticity conclusion is produced.
 
-## Beta limitations
+## Known limitations
 
-- PCM WAV only; no compressed audio or RF64.
-- Only channel 1 is analyzed.
-- Full WAV is decoded into memory.
-- Tk GUI has not been interactively exercised in this headless environment.
-- Windows executable can only be built and smoke-tested on Windows CI/host.
-- Known-location acquisition and environment recurrence detection remain TODO.
+- PCM WAV only (no compressed audio, no RF64); full file decoded into memory.
+- One channel analyzed at a time.
+- Recurrence boundaries are uncertain by about one analysis window.
+- Reference metadata is self-reported; the software cannot verify it. Reference records are hash-chained (tamper-evident), not tamper-proof.
+- Cross-recording recurrence is API/report only; the GUI analyzes one recording.
+- WAVE_FORMAT_EXTENSIBLE WAVs need Python 3.12+.
+- No signed manifests, encryption or multi-user access control.
 
-## Next milestones
+## Not implemented (needs data or external validation)
 
-1. Finish source audit, edge-case QA, and test suite.
-2. Run separate Windows/Linux CI package builds and inspect artifacts.
-3. Add or repair features based on CI, then verify launch behavior on both platforms.
-4. Develop representative acoustic benchmark protocol and data before treating any score as evidence.
-5. Implement the three requested distinctive future features with separate specifications and validation records.
-
+Codec support with provenance, scientific benchmark/calibration on representative recordings, ENF, event recognition, scene classification, stereo/spatial features.
