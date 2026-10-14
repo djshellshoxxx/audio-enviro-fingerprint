@@ -4,8 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 import sqlite3
 from datetime import datetime, timezone
+import json
 
 from .integrity import sha256_file
+from .reference import canonical_metadata, metadata_hash, validate_reference_metadata
 
 
 class CaseStore:
@@ -31,6 +33,19 @@ class CaseStore:
                 body TEXT NOT NULL,
                 created_utc TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS reference_exemplars (
+                id INTEGER PRIMARY KEY,
+                source_path TEXT NOT NULL,
+                source_sha256 TEXT NOT NULL,
+                metadata_json TEXT NOT NULL,
+                metadata_sha256 TEXT NOT NULL,
+                quality_json TEXT NOT NULL,
+                created_utc TEXT NOT NULL
+            );
+            CREATE TRIGGER IF NOT EXISTS reference_no_update BEFORE UPDATE ON reference_exemplars
+            BEGIN SELECT RAISE(ABORT, 'reference exemplars are immutable'); END;
+            CREATE TRIGGER IF NOT EXISTS reference_no_delete BEFORE DELETE ON reference_exemplars
+            BEGIN SELECT RAISE(ABORT, 'reference exemplars are immutable'); END;
         """)
         self.connection.commit()
 
@@ -71,6 +86,42 @@ class CaseStore:
             ORDER BY n.timestamp_seconds,n.id
         """, (evidence_id,)).fetchall()
         return [dict(row) for row in rows]
+
+    def add_reference(self, source_path: str | Path, metadata: dict, quality: dict) -> int:
+        """Store an immutable reference record bound to the source file's SHA-256."""
+        problems = validate_reference_metadata(metadata)
+        if problems:
+            raise ValueError("; ".join(problems))
+        source = Path(source_path).expanduser().resolve()
+        created = datetime.now(timezone.utc).isoformat()
+        cursor = self.connection.execute(
+            "INSERT INTO reference_exemplars(source_path,source_sha256,metadata_json,metadata_sha256,"
+            "quality_json,created_utc) VALUES(?,?,?,?,?,?)",
+            (str(source), sha256_file(source), canonical_metadata(metadata), metadata_hash(metadata),
+             json.dumps(quality, sort_keys=True, allow_nan=False), created))
+        self.connection.commit()
+        return int(cursor.lastrowid)
+
+    def reference_record(self, reference_id: int) -> dict:
+        row = self.connection.execute("SELECT * FROM reference_exemplars WHERE id=?", (reference_id,)).fetchone()
+        if row is None:
+            raise ValueError("Reference record does not exist")
+        record = dict(row)
+        record["metadata"] = json.loads(record["metadata_json"])["metadata"]
+        record["quality"] = json.loads(record["quality_json"])
+        return record
+
+    def list_references(self) -> list[dict]:
+        ids = [r["id"] for r in self.connection.execute("SELECT id FROM reference_exemplars ORDER BY id")]
+        return [self.reference_record(i) for i in ids]
+
+    def verify_reference(self, reference_id: int) -> dict:
+        """Re-hash the source file and metadata and report whether they still match the record."""
+        record = self.reference_record(reference_id)
+        source = Path(record["source_path"])
+        file_ok = source.is_file() and sha256_file(source) == record["source_sha256"]
+        meta_ok = metadata_hash(record["metadata"]) == record["metadata_sha256"]
+        return {"reference_id": reference_id, "source_hash_matches": file_ok, "metadata_hash_matches": meta_ok}
 
     def close(self) -> None:
         self.connection.close()

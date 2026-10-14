@@ -1,6 +1,6 @@
 # Future feature backlog
 
-All ideas here are unimplemented unless explicitly marked otherwise. Prioritize scientific validation and provenance before adding learned classification.
+All ideas here are unimplemented unless explicitly marked otherwise. Items 1-3 below were implemented in 0.2.0-beta.1 (heuristic, unvalidated); their remaining validation work is listed in VALIDATION.md. Prioritize scientific validation and provenance before adding learned classification.
 
 ## Three distinctive features requested for this project
 

@@ -1,4 +1,4 @@
 """Audio Environment Fingerprinter beta."""
 
-__version__ = "0.1.0-beta.1"
+__version__ = "0.2.0-beta.1"
 

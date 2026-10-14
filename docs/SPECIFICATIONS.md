@@ -64,3 +64,25 @@ The Analysis view exposes evidence hash, acoustic fingerprint hash, candidate ti
 
 Each scientific method belongs in its own module, has a documented input/output contract, independent tests, a validation record, and visible result values. Modules consume decoded data and do not rewrite evidence. Reuse in another application is limited to `integrity.py`, `audio_io.py`, `methods/*`, `features.py`, `fingerprint.py`, `comparison.py`, and `transitions.py`; preserve each module's version and caveats when migrating.
 
+
+## 0.2 additions
+
+### Recurrence (`recurrence.py`, method `recurrence-v1`)
+
+`segment_recording` splits frames at candidate transitions; frames straddling a boundary are excluded and segments with fewer than 2 complete frames are marked unusable. Each usable segment gets an `aefp-1` fingerprint over its own frames plus within-segment spread (std) of centroid, flatness and level. `find_recurrences` compares segment pairs with `compare_fingerprints`. Within one recording a pair is a candidate only if score >= 0.80, the segments are not adjacent, and an intervening usable segment scores at least 0.15 lower against the earlier segment (demonstrated departure). Across recordings only the score test applies. Each candidate stores both segment IDs, score, per-feature differences, closest/furthest features, whether deltas exceed 2x within-segment spread, boundary uncertainty (one frame length), thresholds, rationale and confounders. Thresholds are uncalibrated engineering defaults.
+
+### Explainable comparison (`comparison.py`)
+
+Each feature entry holds first/second values, delta, scale, normalized delta (capped at 4), unit, group, direction and fractional contribution (squared normalized delta / sum). Group contributions sum to 1. The centroid scale is symmetric so swapping inputs gives the same score. Warnings flag differing sample rates, level differences >= 6 dB (gain/distance/AGC confounder) and recordings shorter than 5 s. `score_is_probability` is always false.
+
+### Reference acquisition (`reference.py`, `methods/quality.py`, `CaseStore`)
+
+Required metadata: location, ISO 8601 acquisition time, operator, authority/consent, recorder and microphone make/model/serial, input chain, channel, sample rate, placement, orientation, height, source signal, occupancy/activity. Optional: weather, calibration, repeat number/link, deviations. Records are stored in `reference_exemplars` with the file SHA-256, canonical metadata JSON and its SHA-256, and quality review; SQLite triggers reject UPDATE and DELETE. `verify_reference` re-hashes file and metadata. The quality review checks duration (>=30 s), sample rate (>=16 kHz), clipping, peak, DC offset and silence. Comparison against a reference refuses if verification fails and always appends the self-reported-label caveat.
+
+### Background analysis
+
+Analysis runs on a worker thread with progress callback and cancel event (`AnalysisCancelled`). The UI thread only receives results through a queue.
+
+### Report schema `aefp-report-2`
+
+Adds channel analyzed/count, segments, recurrence candidates (with rationale and confounders), session comparisons and stored references.
