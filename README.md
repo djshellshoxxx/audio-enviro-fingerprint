@@ -13,7 +13,7 @@ Cross-platform desktop beta for reproducible, explainable acoustic-environment s
 - Exports a JSON analysis record.
 - Includes an experimental Schroeder decay-slope RT60 estimate for impulse-response data. It is not an ISO 3382 measurement workflow.
 
-This software does not identify a physical location, estimate the probability of a common location, or establish authenticity. It is a research beta and its output requires examiner review. The current change-point threshold and similarity score have not been validated on representative forensic datasets.
+This software does not identify a physical location, estimate the probability of a common location, or establish authenticity. Build workflow definitions do not by themselves establish that downloadable release bundles have passed validation. It is a research beta and its output requires examiner review. The current change-point threshold and similarity score have not been validated on representative forensic datasets.
 
 ## Run from source
 
