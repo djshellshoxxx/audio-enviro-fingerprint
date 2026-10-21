@@ -14,7 +14,7 @@ Initial beta implementation and platform packaging. Repository was empty at star
 - Experimental Schroeder decay-slope estimator for impulse responses.
 - Timestamped SQLite notes bound to the source SHA-256.
 - Tk desktop interface and JSON report export.
-- Linux source-level test suite: 15 tests passed in the last completed run; rerun after final audit.
+- Linux source-level test suite: 30 tests pass; Tk GUI smoke test passes under xvfb (v0.2.0). See SPECIFICATIONS_V2.md.
 
 ## Scientific validation status
 
