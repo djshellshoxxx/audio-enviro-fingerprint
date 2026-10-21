@@ -42,3 +42,6 @@ The GitHub Actions workflow builds separate Windows and Linux application bundle
 - [Future feature backlog](docs/FUTURE_FEATURES.md)
 - [Project status](PROJECT_STATUS.md)
 
+## Wiki
+
+Wiki source pages are in [docs/wiki/](docs/wiki/Home.md): developer guide, architecture summary and codebase map. `docs/SPECIFICATIONS.md` and `docs/VALIDATION.md` remain the authority for requirements and validation status.
