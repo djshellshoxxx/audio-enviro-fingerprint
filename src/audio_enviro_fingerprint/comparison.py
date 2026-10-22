@@ -4,12 +4,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
+from .validation import finite_number
+
 
 @dataclass(frozen=True)
 class Comparison:
     score: float
     differences: dict[str, dict[str, float]]
     explanation: str
+    method: str = "comparison-symmetric-v2"
 
 
 def _features(value: dict) -> dict:
@@ -19,11 +22,30 @@ def _features(value: dict) -> dict:
 
 
 def compare_fingerprints(first: dict, second: dict) -> Comparison:
+    if not isinstance(first, dict) or not isinstance(second, dict):
+        raise ValueError("Fingerprints must be objects")
     v1, v2 = first.get("version", "aefp-1"), second.get("version", "aefp-1")
+    if v1 not in ("aefp-1", "aefp-2") or v2 not in ("aefp-1", "aefp-2"):
+        raise ValueError("Unsupported fingerprint schema version")
     if v1 != v2:
         raise ValueError(f"Fingerprint versions differ: {v1} vs {v2}")
     a, b = _features(first), _features(second)
-    scales = {"spectral_centroid_hz": max(abs(float(a.get("spectral_centroid_hz", 1))), 100.0),
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        raise ValueError("Fingerprint features must be objects")
+    if not all(isinstance(key, str) for key in (*a, *b)):
+        raise ValueError("Fingerprint feature names must be text")
+    for features in (a, b):
+        for name, value in features.items():
+            if name == "band_power_db":
+                if not isinstance(value, dict) or not all(isinstance(k, str) for k in value):
+                    raise ValueError("Band powers must be an object with named bands")
+                for band, power in value.items():
+                    finite_number(power, band)
+            elif name in ("spectral_centroid_hz", "spectral_flatness", "frame_rms_dbfs_p10",
+                          "frame_rms_dbfs_median", "median_rms_dbfs"):
+                finite_number(value, name)
+    scales = {"spectral_centroid_hz": max(abs(float(a.get("spectral_centroid_hz", 1))),
+                                           abs(float(b.get("spectral_centroid_hz", 1))), 100.0),
               "spectral_flatness": 0.25, "frame_rms_dbfs_p10": 20.0,
               "frame_rms_dbfs_median": 20.0, "median_rms_dbfs": 20.0}
     differences = {}
@@ -31,13 +53,13 @@ def compare_fingerprints(first: dict, second: dict) -> Comparison:
     for key in sorted(set(a) & set(b)):
         if key in ("band_power_db",) and isinstance(a[key], dict) and isinstance(b[key], dict):
             for band in sorted(set(a[key]) & set(b[key])):
-                delta = float(b[key][band]) - float(a[key][band])
+                delta = finite_number(float(b[key][band]) - float(a[key][band]), "feature difference")
                 normalized_delta = min(abs(delta) / 15.0, 4.0)
                 differences[f"band_power_db.{band}"] = {"first": float(a[key][band]), "second": float(b[key][band]), "delta": delta, "normalized_delta": normalized_delta}
                 normalized.append(normalized_delta)
         elif key in scales:
             x, y = float(a[key]), float(b[key])
-            delta = y - x
+            delta = finite_number(y - x, "feature difference")
             normalized_delta = min(abs(delta) / scales[key], 4.0)
             differences[key] = {"first": x, "second": y, "delta": delta, "normalized_delta": normalized_delta}
             normalized.append(normalized_delta)
@@ -47,7 +69,7 @@ def compare_fingerprints(first: dict, second: dict) -> Comparison:
     score = float(math.exp(-rms_distance))
     strongest = sorted(differences.items(), key=lambda item: item[1]["normalized_delta"], reverse=True)[:3]
     details = "; ".join(f"{key}: {item['delta']:+.3g} (normalized {item['normalized_delta']:.2f})" for key, item in strongest)
-    explanation = (f"Descriptive similarity score {score:.3f} from {len(normalized)} measured feature "
+    explanation = (f"comparison-symmetric-v2: Descriptive similarity score {score:.3f} from {len(normalized)} measured feature "
                    f"differences. Largest raw differences: {details}. This is a screening aid, not a "
                    "probability of common location or an identification conclusion.")
     return Comparison(score, differences, explanation)

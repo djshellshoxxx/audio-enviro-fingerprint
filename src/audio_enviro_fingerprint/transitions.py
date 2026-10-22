@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
+from .validation import validate_frames
+
 
 @dataclass(frozen=True)
 class Transition:
@@ -19,6 +21,8 @@ def detect_transitions(analysis, threshold: float = 0.35,
     if not math.isfinite(minimum_separation_seconds) or minimum_separation_seconds < 0:
         raise ValueError("Minimum separation must be finite and nonnegative")
     frames = getattr(analysis, "frames", [])
+    if frames:
+        validate_frames(analysis)
     candidates = []
     for before, after in zip(frames, frames[1:]):
         evidence = {}

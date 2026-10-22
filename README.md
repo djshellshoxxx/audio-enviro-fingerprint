@@ -2,10 +2,16 @@
 
 Cross-platform desktop beta for reproducible, explainable acoustic-environment screening. It computes a cryptographic hash of the original file separately from a versioned acoustic feature fingerprint.
 
-## Beta scope
+## Current development additions
 
-- Reads uncompressed integer PCM WAV (8, 16, 24, and 32 bit).
-- Uses channel 1 for analysis. The source file is read only; no downmix is applied.
+The v0.2 development line includes recurrence, guided reference records, per-channel/spatial metrics, musical/hum descriptors, spectrogram export, marker history, CLI, and manifest verification. The completion audit adds optional compressed input via local FFmpeg, decoder provenance, cooperative cancellation, linear-memory recurrence search, and evidence-safe atomic exports. See [current specifications](docs/SPECIFICATIONS_V2.md) and [build/dependency instructions](docs/BUILDING.md). Representative scientific validation and full streaming analysis remain outstanding.
+
+## Original beta scope
+
+- Reads uncompressed WAV: integer PCM (8/16/24/32 bit), IEEE float, WAVE_FORMAT_EXTENSIBLE, RF64.
+- Channel 1 drives the single-channel methods; all channels are kept for inter-channel analysis. No downmix; source is read only.
+- Musical description: dominant tones with note names/cents, key, tempo, pitch, mains hum.
+- Environment recurrence detection, spectrogram, guided known-location reference records, manual markers with revision history, manifest-verified JSON reports, and a CLI (`analyze`, `compare`, `recurrence`, `spectrogram`, `verify`).
 - Computes framewise RMS level, spectral centroid, spectral flatness, and fixed-band power descriptors.
 - Marks candidate transitions from adjacent-frame feature differences and shows the measurements behind each candidate.
 - Compares two acoustic fingerprints with per-feature differences and an explicitly uncalibrated descriptive score.
@@ -32,12 +38,12 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 
 ## Build
 
-The GitHub Actions workflow builds separate Windows and Linux application bundles. Each must be built on its target operating system. Local build instructions are in [docs/BUILDING.md](docs/BUILDING.md).
+The GitHub Actions workflow builds Windows, Linux, and macOS (Apple silicon) bundles; pushing a `v*` tag publishes them as a GitHub Release. Each must be built on its target operating system. Local build instructions are in [docs/BUILDING.md](docs/BUILDING.md).
 
 ## Documentation
 
 - [Research notes and source register](docs/RESEARCH_NOTES.md)
-- [Engineering and method specifications](docs/SPECIFICATIONS.md)
+- [Engineering and method specifications](docs/SPECIFICATIONS.md), [v0.2 additions](docs/SPECIFICATIONS_V2.md)
 - [Validation and QA plan](docs/VALIDATION.md)
 - [Future feature backlog](docs/FUTURE_FEATURES.md)
 - [Project status](PROJECT_STATUS.md)

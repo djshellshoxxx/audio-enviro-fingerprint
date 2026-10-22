@@ -3,16 +3,19 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..validation import audio_input
+
 BANDS = ((0, 125, "0-125 Hz"), (125, 250, "125-250 Hz"),
          (250, 500, "250-500 Hz"), (500, 1000, "500-1000 Hz"),
          (1000, 2000, "1000-2000 Hz"), (2000, 4000, "2000-4000 Hz"))
 
 
 def describe_spectrum(samples: np.ndarray, sample_rate: int) -> dict:
+    samples, sample_rate = audio_input(samples, sample_rate)
     if samples.size < 2:
         return {"centroid_hz": 0.0, "flatness": 0.0,
                 "band_power_db": {name: -240.0 for _, _, name in BANDS}}
-    window = np.hanning(samples.size)
+    window = np.hanning(samples.size) if samples.size > 2 else np.ones(samples.size)
     spectrum = np.abs(np.fft.rfft(samples * window)) ** 2 / (sample_rate * np.sum(window ** 2))
     if samples.size % 2 == 0:
         spectrum[1:-1] *= 2.0
