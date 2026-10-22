@@ -17,10 +17,16 @@ The unit suite uses synthetic signals; passing it does not establish scientific 
 - Cooperative GUI cancellation retains the previous result and publishes no partial result. A running decode or musical analysis may finish its current stage before cancellation takes effect.
 - Marker revisions stay bound to their original evidence; nonfinite note/marker times are rejected.
 
+- Catalog grouping now exposes all pair measurements and deterministic complete-link groups via CLI. Comparison scores are symmetric and labeled `comparison-symmetric-v2`.
+- Ported `aefp-2` reproducible serialization, DC/dropout quality checks, and synthetic benchmarking from older branches; adapted benchmark recurrence to the active API.
+- Reports retain reference records and marker history; rejected imports preserve the prior evidence binding.
+- Windows CI build/package/GUI smoke test succeeded for commit 20b8de3; later changes require a fresh CI run. Linux/macOS jobs were still queued at that checkpoint.
+
 ## Remaining work
 
 - Full streaming decode and performance verification on large recordings. Recurrence now uses linear working memory; cooperative cancellation is implemented for hashing, frame extraction, recurrence and pipeline stage boundaries.
-- Representative field benchmark acquisition and scientific calibration.
+- Representative field benchmark acquisition and scientific calibration (synthetic benchmark is implemented).
+- Reconcile remaining incompatible modules and UI behavior from older branches before declaring repository completion.
 - ENF time series, scene/event classification, reflection analysis, robustness exploration, blind comparisons, and broader case reconstruction remain future research features in docs/FUTURE_FEATURES.md.
 - Code signing/notarization and Intel macOS builds remain unavailable.
 

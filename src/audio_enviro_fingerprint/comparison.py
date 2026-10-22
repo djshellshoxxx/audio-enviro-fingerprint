@@ -10,6 +10,7 @@ class Comparison:
     score: float
     differences: dict[str, dict[str, float]]
     explanation: str
+    method: str = "comparison-symmetric-v2"
 
 
 def _features(value: dict) -> dict:
@@ -23,7 +24,8 @@ def compare_fingerprints(first: dict, second: dict) -> Comparison:
     if v1 != v2:
         raise ValueError(f"Fingerprint versions differ: {v1} vs {v2}")
     a, b = _features(first), _features(second)
-    scales = {"spectral_centroid_hz": max(abs(float(a.get("spectral_centroid_hz", 1))), 100.0),
+    scales = {"spectral_centroid_hz": max(abs(float(a.get("spectral_centroid_hz", 1))),
+                                           abs(float(b.get("spectral_centroid_hz", 1))), 100.0),
               "spectral_flatness": 0.25, "frame_rms_dbfs_p10": 20.0,
               "frame_rms_dbfs_median": 20.0, "median_rms_dbfs": 20.0}
     differences = {}
@@ -47,7 +49,7 @@ def compare_fingerprints(first: dict, second: dict) -> Comparison:
     score = float(math.exp(-rms_distance))
     strongest = sorted(differences.items(), key=lambda item: item[1]["normalized_delta"], reverse=True)[:3]
     details = "; ".join(f"{key}: {item['delta']:+.3g} (normalized {item['normalized_delta']:.2f})" for key, item in strongest)
-    explanation = (f"Descriptive similarity score {score:.3f} from {len(normalized)} measured feature "
+    explanation = (f"comparison-symmetric-v2: Descriptive similarity score {score:.3f} from {len(normalized)} measured feature "
                    f"differences. Largest raw differences: {details}. This is a screening aid, not a "
                    "probability of common location or an identification conclusion.")
     return Comparison(score, differences, explanation)

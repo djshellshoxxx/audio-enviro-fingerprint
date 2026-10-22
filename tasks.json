@@ -60,6 +60,21 @@
       "id": "cooperative-cancellation",
       "status": "implemented",
       "title": "GUI cancellation with hashing/frame/recurrence checkpoints and no partial-result publication"
+    },
+    {
+      "id": "catalog-clustering",
+      "status": "implemented",
+      "title": "Deterministic descriptor grouping with all pair explanations; no physical attribution"
+    },
+    {
+      "id": "synthetic-benchmark",
+      "status": "implemented",
+      "title": "Ported deterministic synthetic comparison, transition, recurrence and confounder scenarios"
+    },
+    {
+      "id": "branch-reconciliation",
+      "status": "in_progress",
+      "title": "Port remaining compatible older modules and resolve incompatible segmentation/store/GUI alternatives"
     }
   ]
 }

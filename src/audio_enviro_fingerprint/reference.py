@@ -74,6 +74,11 @@ def review_reference(meta: ReferenceMetadata, samples: np.ndarray, sample_rate: 
         f"Repeat {meta.repeat_number} of {meta.repeats_planned} planned")
     add("calibration", "pass" if meta.calibration.strip() else "warn",
         "Calibration documented" if meta.calibration.strip() else "No calibration documented")
+    from .methods.quality import review_quality
+    # Preserve the acquisition protocol's duration/rate checks, adding the older
+    # development branch's independent DC/dropout checks without duplicate names.
+    quality = review_quality(samples, sample_rate)
+    checks.extend(c for c in quality["checks"] if c["check"] in ("dc_offset", "silence_fraction"))
     order = {"pass": 0, "warn": 1, "fail": 2}
     overall = max((c["status"] for c in checks), key=order.get)
     return {"schema": SCHEMA, "overall": overall, "checks": checks,

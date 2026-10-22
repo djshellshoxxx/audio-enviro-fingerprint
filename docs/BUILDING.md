@@ -28,7 +28,7 @@ The resulting application folder is in `dist/AudioEnvironmentFingerprinter`. Win
 
 ## Beta build identifiers
 
-The source version is `0.2.0`. CI names artifacts by operating system and source ref. The first published binaries remain provisional until launched and smoke-tested on their target systems.
+The source version is `0.3.0b1`. CI names artifacts by operating system and source ref. The first published binaries remain provisional until launched and smoke-tested on their target systems.
 
 
 ## Optional compressed input

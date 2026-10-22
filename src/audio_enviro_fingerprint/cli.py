@@ -31,6 +31,12 @@ def _build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("spectrogram", help="render a spectrogram PNG")
     s.add_argument("wav")
     s.add_argument("output")
+    c = sub.add_parser("cluster", help="group recording descriptors with transparent pair comparisons")
+    c.add_argument("recordings", nargs="+")
+    c.add_argument("--max-distance", type=float, default=0.25)
+    benchmark = sub.add_parser("benchmark", help="run synthetic software benchmark, not forensic validation")
+    benchmark.add_argument("--quick", action="store_true")
+    benchmark.add_argument("--seed", type=int, default=0)
     v = sub.add_parser("verify", help="verify a report manifest and its evidence hash")
     v.add_argument("report")
     return parser
@@ -63,6 +69,12 @@ def run(argv: list[str]) -> int:
             audio = load_audio(args.wav)
             from .integrity import write_export
             write_export(args.output, spectrogram_png(audio.samples, audio.sample_rate), args.wav)
+        elif args.command == "cluster":
+            from .catalog import cluster_recordings
+            print(json.dumps(cluster_recordings(args.recordings, args.max_distance), indent=2, allow_nan=False))
+        elif args.command == "benchmark":
+            from .benchmark import run_benchmark
+            print(json.dumps(run_benchmark(args.seed, args.quick), indent=2, sort_keys=True, allow_nan=False))
         elif args.command == "verify":
             result = verify_report(args.report)
             print(json.dumps(result))

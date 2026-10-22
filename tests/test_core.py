@@ -129,8 +129,8 @@ class FeatureTests(unittest.TestCase):
         first = make_fingerprint(analysis)
         second = make_fingerprint(analysis)
         self.assertEqual(first.fingerprint_hash, second.fingerprint_hash)
-        self.assertEqual(first.version, "aefp-1")
-        self.assertEqual(json.loads(first.canonical_json)["version"], "aefp-1")
+        self.assertEqual(first.version, "aefp-2")
+        self.assertEqual(json.loads(first.canonical_json)["version"], "aefp-2")
 
 
 class ReverberationTests(unittest.TestCase):

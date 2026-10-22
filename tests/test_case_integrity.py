@@ -30,3 +30,19 @@ class CaseIntegrityTests(unittest.TestCase):
                             store.add_note(eid, time, 'title', 'body')
                         with self.assertRaises(ValueError):
                             store.save_marker(eid, time, 'marker')
+
+    def test_failed_import_preserves_previous_evidence_binding(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from audio_enviro_fingerprint.app import FingerprinterApp
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / 'a.wav'
+            source.write_bytes(b'previous')
+            with CaseStore(Path(tmp) / 'case.db') as store:
+                original = store.register_evidence(source)
+                source.write_bytes(b'changed')
+                app = SimpleNamespace(store=store, evidence_id=original, result={'previous': True})
+                with patch('audio_enviro_fingerprint.app.messagebox.showerror'):
+                    FingerprinterApp.apply_result(app, {'path': source, 'sha256': '0' * 64})
+                self.assertEqual(app.evidence_id, original)
+                self.assertEqual(app.result, {'previous': True})

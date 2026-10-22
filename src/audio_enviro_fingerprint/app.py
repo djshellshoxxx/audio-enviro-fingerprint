@@ -186,15 +186,16 @@ class FingerprinterApp(tk.Tk):
         self.apply_result(payload)
 
     def apply_result(self, result):
-        self.evidence_id = self.store.register_evidence(result["path"])
-        if self.store.evidence_record(self.evidence_id)["sha256"] != result["sha256"]:
+        evidence_id = self.store.register_evidence(result["path"])
+        if self.store.evidence_record(evidence_id)["sha256"] != result["sha256"]:
             messagebox.showerror("Evidence changed", "The file changed while it was being loaded.")
             return
+        self.evidence_id = evidence_id
         self.result = result
         audio, fp = result["audio"], result["fingerprint"]
         self.file_label.configure(text=f"{result['path'].name} · {audio.duration_seconds:.2f} s · {audio.sample_rate} Hz · "
                                        f"{audio.channels} ch ({audio.sample_format}) · analyzing channel 1")
-        self.hash_label.configure(text=f"Evidence SHA-256: {result['sha256']}\nAcoustic fingerprint aefp-1: {fp.fingerprint_hash}")
+        self.hash_label.configure(text=f"Evidence SHA-256: {result['sha256']}\nAcoustic fingerprint {fp.version}: {fp.fingerprint_hash}")
         fill(self.transitions, [(f"{e.timestamp_seconds:.2f}", f"{e.strength:.3f}",
                                  ", ".join(f"{k} {v:+.2f}" for k, v in e.evidence.items())) for e in result["transitions"]])
         rows = []
@@ -302,7 +303,10 @@ class FingerprinterApp(tk.Tk):
             from .pipeline import report_sections
             from .report import build_report
             sections = report_sections(self.result, self.store.notes_for(self.evidence_id),
-                                       self.store.markers_for(self.evidence_id))
+                                       self.store.markers_for(self.evidence_id),
+                                       marker_history=self.store.markers_for(self.evidence_id, True),
+                                       references=[r for r in self.store.references()
+                                                   if r["evidence_id"] == self.evidence_id])
             write_report(target, build_report(self.result["path"], self.result["sha256"], sections))
             messagebox.showinfo("Export complete", f"Report with manifest written to {target}")
         except Exception as exc:

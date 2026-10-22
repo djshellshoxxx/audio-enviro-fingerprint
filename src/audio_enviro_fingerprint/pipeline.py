@@ -56,7 +56,8 @@ def analyze_file(path: str | Path, musical: bool = True, progress=None, cancel_e
             "sha256": initial, "path": path}
 
 
-def report_sections(result: dict, notes: list | None = None, markers: list | None = None) -> dict:
+def report_sections(result: dict, notes: list | None = None, markers: list | None = None, *,
+                    marker_history: list | None = None, references: list | None = None) -> dict:
     audio = result["audio"]
     return {"audio": {"sample_rate": audio.sample_rate, "channels": audio.channels,
                       "duration_seconds": audio.duration_seconds, "sample_format": audio.sample_format,
@@ -68,8 +69,10 @@ def report_sections(result: dict, notes: list | None = None, markers: list | Non
             "recurrences": {"method": "recurrence-v1", "items": [r.to_dict() for r in result["recurrences"]],
                             "confounders": list(CONFOUNDERS)},
             "mains_hum": result["hum"], "channels": result["channels"], "musical": result["musical"],
-            "notes": notes or [], "markers": markers or []}
+            "notes": notes or [], "markers": markers or [],
+            "marker_history": marker_history or [], "references": references or []}
 
 
-def full_report(result: dict, notes=None, markers=None) -> dict:
-    return build_report(result["path"], result["sha256"], report_sections(result, notes, markers))
+def full_report(result: dict, notes=None, markers=None, *, marker_history=None, references=None) -> dict:
+    return build_report(result["path"], result["sha256"], report_sections(
+        result, notes, markers, marker_history=marker_history, references=references))
