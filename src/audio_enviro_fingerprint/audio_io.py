@@ -71,28 +71,46 @@ def _parse_riff(data: bytes) -> tuple[dict, bytes, int]:
     """Return (fmt fields, data payload, declared data size) from a RIFF/RF64 image."""
     if len(data) < 12 or data[8:12] != b"WAVE" or data[:4] not in (b"RIFF", b"RF64"):
         raise ValueError("Not a RIFF/WAVE file")
+    is_rf64 = data[:4] == b"RF64"
+    riff_size = struct.unpack_from("<I", data, 4)[0]
+    if is_rf64:
+        if riff_size != 0xFFFFFFFF or data[12:16] != b"ds64":
+            raise ValueError("RF64 requires its size sentinel and initial ds64 chunk")
+        container_end = len(data)  # Replaced by the checked ds64 size below.
+    else:
+        container_end = 8 + riff_size
+        if riff_size < 4 or container_end > len(data):
+            raise ValueError("RIFF container is truncated or has an invalid declared size")
     rf64_sizes: dict[str, int] = {}
     fmt = None
     payload = None
     declared = 0
     pos = 12
-    while pos + _MAX_CHUNK_HEADER <= len(data):
+    while pos + _MAX_CHUNK_HEADER <= container_end:
         cid = data[pos:pos + 4]
         size = struct.unpack_from("<I", data, pos + 4)[0]
         body = pos + _MAX_CHUNK_HEADER
-        if cid == b"ds64":
-            if size < 28 or body + size > len(data):
+        if cid == b"ds64" and is_rf64:
+            if rf64_sizes or size < 28 or body + size > container_end:
                 raise ValueError("Corrupt RF64 ds64 chunk")
             riff_size, data_size, _sample_count = struct.unpack_from("<QQQ", data, body)
+            table_length = struct.unpack_from("<I", data, body + 24)[0]
+            if size < 28 + 12 * table_length:
+                raise ValueError("Truncated RF64 ds64 size table")
+            container_end = 8 + riff_size
+            if riff_size < 4 or container_end > len(data) or body + size > container_end:
+                raise ValueError("RF64 container is truncated or has an invalid declared size")
             rf64_sizes = {"data": data_size}
         if cid == b"data" and size == 0xFFFFFFFF and "data" in rf64_sizes:
             size = rf64_sizes["data"]
+        if body + size > container_end:
+            raise ValueError("WAV chunk exceeds the declared RIFF/RF64 container")
         if cid == b"fmt ":
-            if size < 16 or body + size > len(data):
+            if size < 16 or body + size > container_end:
                 raise ValueError("Corrupt fmt chunk")
             tag, ch, rate, byte_rate, align, bits = struct.unpack_from("<HHIIHH", data, body)
             if tag == _FMT_EXTENSIBLE:
-                if size < 40 or struct.unpack_from("<H", data, body + 16)[0] < 22:
+                if size < 40 or not 22 <= struct.unpack_from("<H", data, body + 16)[0] <= size - 18:
                     raise ValueError("Corrupt WAVE_FORMAT_EXTENSIBLE chunk")
                 subtype = data[body + 24:body + 40]
                 if subtype[4:] != bytes.fromhex("00001000800000aa00389b71"):

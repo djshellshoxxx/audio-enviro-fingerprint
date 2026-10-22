@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..validation import audio_input
+
 
 def estimate_t20(impulse_response: np.ndarray, sample_rate: int) -> dict:
-    signal = np.asarray(impulse_response, dtype=np.float64)
+    signal, sample_rate = audio_input(impulse_response, sample_rate)
     if sample_rate <= 0 or signal.ndim != 1 or signal.size < sample_rate // 4:
         raise ValueError("Provide at least 0.25 s of mono impulse-response audio")
     energy = signal * signal

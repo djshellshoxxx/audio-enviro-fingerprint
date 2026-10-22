@@ -6,13 +6,17 @@ import zlib
 
 import numpy as np
 
+from .validation import audio_input
+
 
 def compute_spectrogram(samples: np.ndarray, sample_rate: int, n_fft: int = 1024,
                         max_columns: int = 1200, floor_db: float = -100.0) -> dict:
-    x = np.asarray(samples, dtype=np.float64)
+    x, sample_rate = audio_input(samples, sample_rate)
+    if type(n_fft) is not int or n_fft < 3 or type(max_columns) is not int or max_columns < 1 or not np.isfinite(floor_db):
+        raise ValueError("Expected FFT size >=3, positive column count and finite floor")
     if x.size < n_fft:
         x = np.pad(x, (0, n_fft - x.size))
-    hop = max(n_fft // 2, int(np.ceil((x.size - n_fft) / max(max_columns - 1, 1))))
+    hop = x.size if max_columns == 1 else max(n_fft // 2, int(np.ceil((x.size - n_fft) / (max_columns - 1))))
     count = 1 + (x.size - n_fft) // hop
     index = np.arange(n_fft)[None, :] + hop * np.arange(count)[:, None]
     window = np.hanning(n_fft)
@@ -28,6 +32,11 @@ _STOPS = np.array([[0, 0, 4], [66, 10, 104], [147, 38, 103], [221, 81, 58], [252
 
 def colorize(db: np.ndarray, height: int = 256, dynamic_range_db: float = 80.0) -> np.ndarray:
     """Map a (freq x time) dB array to uint8 RGB, low frequencies at the bottom."""
+    db = np.asarray(db, dtype=np.float64)
+    if db.ndim != 2 or not all(db.shape) or not np.all(np.isfinite(db)):
+        raise ValueError("Spectrogram must be a nonempty finite frequency-by-time matrix")
+    if type(height) is not int or height < 1 or not np.isfinite(dynamic_range_db) or dynamic_range_db <= 0:
+        raise ValueError("Image height and finite dynamic range must be positive")
     top = float(db.max())
     norm = np.clip((db - (top - dynamic_range_db)) / dynamic_range_db, 0, 1)
     rows = np.linspace(norm.shape[0] - 1, 0, height).astype(int)
@@ -40,6 +49,9 @@ def colorize(db: np.ndarray, height: int = 256, dynamic_range_db: float = 80.0) 
 
 def encode_png(rgb: np.ndarray) -> bytes:
     """Encode an (H, W, 3) uint8 array as PNG."""
+    rgb = np.asarray(rgb)
+    if rgb.ndim != 3 or rgb.shape[2] != 3 or not all(rgb.shape) or rgb.dtype != np.uint8:
+        raise ValueError("PNG input must be a nonempty height-by-width-by-3 uint8 RGB array")
     h, w, _ = rgb.shape
     raw = b"".join(b"\x00" + rgb[y].tobytes() for y in range(h))
 

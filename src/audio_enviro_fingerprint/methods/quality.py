@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..validation import audio_input
+
 def dbfs(value):
     return float(20 * np.log10(max(float(value), 1e-12)))
 
@@ -12,7 +14,7 @@ MIN_SAMPLE_RATE = 16000
 
 
 def review_quality(samples: np.ndarray, sample_rate: int) -> dict:
-    x = np.asarray(samples, dtype=np.float64)
+    x, sample_rate = audio_input(samples, sample_rate)
     if x.ndim != 1 or x.size == 0 or sample_rate <= 0 or not np.all(np.isfinite(x)):
         raise ValueError("Expected non-empty mono samples and a positive sample rate")
     peak = float(np.max(np.abs(x)))

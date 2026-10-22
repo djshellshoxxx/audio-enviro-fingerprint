@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from .features import analyze_audio
+from .validation import audio_input, finite_number
 from .fingerprint import make_fingerprint
 
 METHOD = "multichannel-v1"
@@ -15,11 +16,16 @@ def _rms_db(x: np.ndarray) -> float:
 
 def channel_pair_metrics(a: np.ndarray, b: np.ndarray, sample_rate: int, max_lag_ms: float = 1.5) -> dict:
     """Zero-lag correlation, level difference, inter-channel lag, and mid/side balance."""
+    a, sample_rate = audio_input(a, sample_rate)
+    b, _ = audio_input(b, sample_rate)
+    max_lag_ms = finite_number(max_lag_ms, "Maximum lag")
+    if not a.size or not b.size or max_lag_ms < 0:
+        raise ValueError("Channel pairs require nonempty audio and a nonnegative lag limit")
     n = min(a.size, b.size)
     a, b = a[:n] - a[:n].mean(), b[:n] - b[:n].mean()
     denom = float(np.sqrt(np.sum(a * a) * np.sum(b * b)))
     corr0 = float(np.sum(a * b) / denom) if denom > 0 else 0.0
-    max_lag = max(1, int(sample_rate * max_lag_ms / 1000.0))
+    max_lag = min(n - 1, int(sample_rate * max_lag_ms / 1000.0))
     size = 1 << int(np.ceil(np.log2(2 * n)))
     xc = np.fft.irfft(np.fft.rfft(a, size) * np.conj(np.fft.rfft(b, size)), size)
     lags = np.arange(-max_lag, max_lag + 1)

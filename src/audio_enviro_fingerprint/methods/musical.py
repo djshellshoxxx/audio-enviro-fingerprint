@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..validation import audio_input, finite_number
+
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 # Krumhansl-Kessler (1982) probe-tone profiles.
 _MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
@@ -17,14 +19,26 @@ def hz_to_note(frequency_hz: float, a4_hz: float = 440.0) -> dict:
     """Nearest equal-tempered note, octave, and signed cents deviation."""
     if not np.isfinite(frequency_hz) or frequency_hz <= 0:
         raise ValueError("Frequency must be positive and finite")
-    midi = 69.0 + 12.0 * np.log2(frequency_hz / a4_hz)
+    a4_hz = finite_number(a4_hz, "A4 reference")
+    if a4_hz <= 0:
+        raise ValueError("A4 reference must be positive")
+    midi = 69.0 + 12.0 * (np.log2(frequency_hz) - np.log2(a4_hz))
     nearest = int(round(midi))
     return {"note": f"{NOTE_NAMES[nearest % 12]}{nearest // 12 - 1}", "midi": nearest,
             "cents": float((midi - nearest) * 100.0), "frequency_hz": float(frequency_hz)}
 
 
 def note_to_hz(midi: float, a4_hz: float = 440.0) -> float:
-    return float(a4_hz * 2.0 ** ((midi - 69.0) / 12.0))
+    midi, a4_hz = finite_number(midi, "MIDI note"), finite_number(a4_hz, "A4 reference")
+    if a4_hz <= 0:
+        raise ValueError("A4 reference must be positive")
+    try:
+        result = finite_number(a4_hz * 2.0 ** ((midi - 69.0) / 12.0), "Note frequency")
+        if result <= 0:
+            raise ValueError("Note frequency is below the numerical range")
+        return result
+    except OverflowError as exc:
+        raise ValueError("Note frequency exceeds the numerical range") from exc
 
 
 def _frames(samples: np.ndarray, size: int, hop: int) -> np.ndarray:
@@ -42,6 +56,9 @@ def _stft_power(samples: np.ndarray, size: int, hop: int) -> np.ndarray:
 def dominant_tones(samples: np.ndarray, sample_rate: int, count: int = 5,
                    min_hz: float = 20.0, max_hz: float = 4000.0, a4_hz: float = 440.0) -> list[dict]:
     """Strongest stationary spectral peaks (Welch average) labelled as musical notes."""
+    samples, sample_rate = audio_input(samples, sample_rate)
+    if type(count) is not int or count < 1 or not all(np.isfinite(v) for v in (min_hz, max_hz, a4_hz)) or not 0 < min_hz < max_hz or a4_hz <= 0:
+        raise ValueError("Expected a positive peak count, frequency interval and A4 reference")
     size = 1 << int(np.clip(np.ceil(np.log2(sample_rate)), 10, 16))   # ~1 Hz resolution
     power = _stft_power(np.asarray(samples, dtype=np.float64), size, size // 2).mean(axis=0)
     freqs = np.fft.rfftfreq(size, 1.0 / sample_rate)
@@ -70,6 +87,9 @@ def dominant_tones(samples: np.ndarray, sample_rate: int, count: int = 5,
 def chromagram(samples: np.ndarray, sample_rate: int, a4_hz: float = 440.0,
                fmin: float = 65.0, fmax: float = 2000.0) -> np.ndarray:
     """Return a (frames, 12) chroma matrix, C = column 0."""
+    samples, sample_rate = audio_input(samples, sample_rate)
+    if not all(np.isfinite(v) for v in (fmin, fmax, a4_hz)) or not 0 < fmin < fmax or a4_hz <= 0:
+        raise ValueError("Expected positive chroma frequency interval and A4 reference")
     size = 1 << int(np.clip(np.ceil(np.log2(sample_rate * 0.186)), 10, 15))
     power = _stft_power(np.asarray(samples, dtype=np.float64), size, size // 2)
     freqs = np.fft.rfftfreq(size, 1.0 / sample_rate)
@@ -84,7 +104,10 @@ def chromagram(samples: np.ndarray, sample_rate: int, a4_hz: float = 440.0,
 
 def estimate_key(chroma: np.ndarray) -> dict:
     """Krumhansl-Schmuckler key estimate with ranked alternatives (correlations)."""
-    profile = np.asarray(chroma, dtype=np.float64).sum(axis=0)
+    chroma = np.asarray(chroma, dtype=np.float64)
+    if chroma.ndim != 2 or chroma.shape[1] != 12 or not np.all(np.isfinite(chroma)) or np.any(chroma < 0):
+        raise ValueError("Chroma must be a finite nonnegative frames-by-12 matrix")
+    profile = chroma.sum(axis=0)
     if profile.sum() <= 0 or np.ptp(profile) == 0:
         return {"key": None, "mode": None, "correlation": 0.0, "alternatives": [],
                 "chroma": [0.0] * 12}
@@ -112,8 +135,10 @@ def pitch_track(samples: np.ndarray, sample_rate: int, fmin: float = 60.0, fmax:
                 frame_seconds: float = 0.064, hop_seconds: float = 0.032,
                 threshold: float = 0.15) -> list[dict]:
     """Per-frame f0 via the YIN difference function (de Cheveigne & Kawahara, 2002)."""
-    x = np.asarray(samples, dtype=np.float64)
-    size = int(frame_seconds * sample_rate)
+    x, sample_rate = audio_input(samples, sample_rate)
+    if not all(np.isfinite(v) for v in (fmin, fmax, frame_seconds, hop_seconds, threshold)) or not 0 < fmin < fmax or min(frame_seconds, hop_seconds) <= 0 or not 0 < threshold < 1:
+        raise ValueError("Invalid pitch frequency, frame, hop or threshold parameters")
+    size = max(2, int(frame_seconds * sample_rate))
     hop = max(1, int(hop_seconds * sample_rate))
     tau_min, tau_max = max(2, int(sample_rate / fmax)), min(size // 2, int(sample_rate / fmin))
     if tau_max <= tau_min + 1 or x.size < size:
@@ -154,7 +179,9 @@ def pitch_track(samples: np.ndarray, sample_rate: int, fmin: float = 60.0, fmax:
 def estimate_tempo(samples: np.ndarray, sample_rate: int, bpm_min: float = 40.0,
                    bpm_max: float = 220.0) -> dict:
     """Tempo from the autocorrelation of a spectral-flux onset envelope."""
-    x = np.asarray(samples, dtype=np.float64)
+    x, sample_rate = audio_input(samples, sample_rate)
+    if not all(np.isfinite(v) for v in (bpm_min, bpm_max)) or not 0 < bpm_min < bpm_max:
+        raise ValueError("Tempo limits must be finite, positive and ordered")
     size, hop = 1024, 256
     if x.size < size * 8:
         return {"bpm": None, "confidence": 0.0, "onset_count": 0}
@@ -166,7 +193,7 @@ def estimate_tempo(samples: np.ndarray, sample_rate: int, bpm_min: float = 40.0,
     rate = sample_rate / hop
     acf = np.correlate(flux, flux, "full")[flux.size - 1:]
     acf = acf / acf[0]
-    lag_lo, lag_hi = int(rate * 60 / bpm_max), min(int(rate * 60 / bpm_min), acf.size - 1)
+    lag_lo, lag_hi = max(1, int(rate * 60 / bpm_max)), min(int(rate * 60 / bpm_min), acf.size - 1)
     if lag_hi <= lag_lo + 1:
         return {"bpm": None, "confidence": 0.0, "onset_count": 0}
     lags = np.arange(lag_lo, lag_hi + 1)

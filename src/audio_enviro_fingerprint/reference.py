@@ -12,6 +12,8 @@ import math
 
 import numpy as np
 
+from .validation import audio_input
+
 SCHEMA = "aefp-reference-1"
 REQUIRED = ("location_id", "recorded_utc", "operator", "recorder_make_model", "microphone_make_model",
             "input_chain", "channel_assignment", "placement", "orientation", "height_m",
@@ -52,6 +54,7 @@ class ReferenceMetadata:
 
 def review_reference(meta: ReferenceMetadata, samples: np.ndarray, sample_rate: int) -> dict:
     """Return pass/warn/fail checks. Overall status is the worst individual status."""
+    samples, sample_rate = audio_input(samples, sample_rate)
     checks = []
 
     def add(name, status, detail):
@@ -92,8 +95,8 @@ def review_reference(meta: ReferenceMetadata, samples: np.ndarray, sample_rate: 
     add("repeats", "fail" if not valid_repeats else "pass" if meta.repeat_number == meta.repeats_planned >= 2 else "warn",
         f"Repeat {meta.repeat_number} of {meta.repeats_planned} planned" if valid_repeats
         else "Repeat number and planned total must be positive integers with number <= total")
-    add("calibration", "pass" if meta.calibration.strip() else "warn",
-        "Calibration documented" if meta.calibration.strip() else "No calibration documented")
+    add("calibration", "pass" if (isinstance(meta.calibration, str) and meta.calibration.strip()) else "warn",
+        "Calibration documented" if (isinstance(meta.calibration, str) and meta.calibration.strip()) else "No calibration documented")
     from .methods.quality import review_quality
     # Preserve the acquisition protocol's duration/rate checks, adding the older
     # development branch's independent DC/dropout checks without duplicate names.

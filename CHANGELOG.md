@@ -16,6 +16,8 @@
 - Comparisons use `comparison-symmetric-v2`; swapping recordings no longer changes the score. Earlier thresholds require re-evaluation.
 
 ### Fixed
+- Enforce RIFF/RF64 container and extension bounds; validate finite reusable numerical inputs and supported fingerprint schemas.
+- Preserve finite silence/high-rate reports; hum windows now resolve narrow bands and disclose frequency resolution/unavailable measurements.
 - Acquisition reviews validate UTC/height/repeat values and detect positive 8-bit full-scale clipping; reference JSON rejects NaN/Infinity.
 - GUI exports protect the active case database and filesystem aliases.
 - Reports recheck evidence integrity at export; hashing/serialization run off the UI thread with cooperative cancellation.

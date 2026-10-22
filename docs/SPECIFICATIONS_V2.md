@@ -27,7 +27,7 @@ Supplements `SPECIFICATIONS.md`. All methods are descriptive and unvalidated for
 - Tempo: spectral-flux onset envelope (1024/256 STFT), autocorrelation over 40–220 BPM with log-Gaussian prior at 120 BPM (octave-error suppression). `confidence` = normalized autocorrelation peak (not a probability).
 - Limitation: designed for monophonic/stationary material; polyphonic speech/noise yields low confidence.
 
-**Mains hum.** Mean power spectrum (32768-pt Hann segments). For base 50 and 60 Hz, harmonics 1–6: peak within ±0.5 Hz over median of the 2–8 Hz flanking ring (dB). Detected if mean of first three harmonics >10 dB. Reports the base with higher prominence.
+**Mains hum.** Mean power spectrum (Hann segments, power-of-two FFT size at least 32768 and at least the sample rate in samples, giving ≤1 Hz bin spacing). For base 50 and 60 Hz, harmonics 1–6: peak within ±0.5 Hz over median of the 2–8 Hz flanking ring (dB). Detected if mean of first three harmonics >10 dB. Reports the base with higher prominence.
 
 **Recurrence.** Per analysis frame a vector of fixed-scale normalized features: RMS/15 dB, log2(centroid)/1.5, flatness/0.25, each band power/15 dB. Distance = RMS of component differences (uncalibrated). Within a recording, frame *j* matches earlier frame *i* if `j−i ≥ gap`, `D(i,j) ≤ threshold` (default 0.25), and some intervening frame has `D(i,k) ≥ departure` (default 0.6). Consecutive matched frames merge into one segment ID with mean/min distance, departure peak, and mean signed per-feature differences. Cross-recording mode matches every frame of A to the best frame of B without a departure test. Constants: `CONFOUNDERS` is emitted in every report. Validation required before any threshold is trusted (see VALIDATION.md).
 
@@ -95,3 +95,25 @@ nonnegative height in meters, textual required fields, and positive integer
 repeat numbers no greater than the planned total. Incomplete or invalid fields
 produce failed review checks and remain visible if an examiner deliberately
 saves a failed reference. Acquisition JSON storage rejects nonfinite numbers.
+
+## Finite numerical and container contracts
+
+The strict native decoder bounds every fmt/data chunk by the declared RIFF or
+RF64 ds64 container length, rejects truncated ds64 tables and extensible fmt
+extensions, and ignores bytes outside a valid declared container when decoding
+(the original evidence hash still covers every byte). Valid integer, float,
+extensible and RF64 fixtures remain supported.
+
+Independent numerical entry points reject nonfinite/nonreal/nonmono arrays,
+invalid sample rates, malformed feature vectors and unsupported fingerprint
+schema IDs. Both `aefp-1` and `aefp-2` comparisons remain supported within the
+same schema. Finite-result regression tests run silence and harmonic tones
+through every report section at 8, 16, 44.1, 48, 96 and 192 kHz, including stereo
+and musical descriptors, strict JSON serialization and report verification.
+
+Hum analysis now floors zero spectral power before logarithms and discloses its
+FFT size and frequency resolution. Higher-rate recordings use a sufficiently
+long power-of-two window so a ±0.5 Hz harmonic band contains a frequency bin.
+Insufficient duration is reported as unavailable rather than a measured absence;
+the GUI shows that distinction and the resolution. These are numerical and
+resolution corrections, not ENF calibration or validation of physical attribution.

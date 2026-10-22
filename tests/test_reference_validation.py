@@ -60,3 +60,8 @@ class AcquisitionValidationTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         store.add_reference(evidence, metadata, review)
                 self.assertEqual(store.references(), [])
+
+    def test_missing_optional_calibration_is_reviewed_without_crashing(self):
+        metadata = self.metadata()
+        metadata.calibration = None
+        self.assertEqual(self.review(metadata)['calibration'], 'warn')

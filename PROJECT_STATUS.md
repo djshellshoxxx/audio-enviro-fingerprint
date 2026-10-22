@@ -51,3 +51,10 @@ Required provenance-contract review also corrected semantic UTC/height/repeat
 validation, positive 8-bit clipping detection, and nonfinite reference JSON
 storage, with focused regression coverage. These checks establish metadata
 well-formedness only; they do not verify operator claims or calibrate methods.
+
+Final input-contract hardening bounds RIFF/RF64 chunk parsing by declared
+container sizes, validates finite direct numerical inputs, and preserves both
+supported fingerprint schema versions. Full report JSON invariants cover stereo
+silence and tones across 8–192 kHz. Hum analysis no longer emits infinite values
+for silence or crashes on empty high-rate harmonic bins, and discloses actual
+frequency resolution and unavailable short-recording results.

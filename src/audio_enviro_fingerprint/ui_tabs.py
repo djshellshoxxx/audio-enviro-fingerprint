@@ -112,8 +112,15 @@ class MusicalTab(ttk.Frame):
         alts = [{"key": key["key"], "mode": key["mode"], "correlation": key["correlation"]}] + key["alternatives"] if key["key"] else []
         fill(self.keys, [(f"{a['key']} {a['mode']}", f"{a['correlation']:.3f}") for a in alts])
         hum = result["hum"]
-        self.hum.configure(text=(f"Mains hum: {hum['fundamental_hz']:.0f} Hz fundamental detected" if hum.get("detected")
-                                 else "Mains hum: not detected") + "  (tonal interference only; not ENF analysis)")
+        if hum.get("reason"):
+            hum_text = f"Mains hum: unavailable — {hum['reason']}"
+        elif hum.get("detected"):
+            hum_text = f"Mains hum: {hum['fundamental_hz']:.0f} Hz candidate fundamental"
+        else:
+            hum_text = "Mains hum: not detected"
+        if "frequency_resolution_hz" in hum:
+            hum_text += f" · frequency resolution {hum['frequency_resolution_hz']:.3g} Hz"
+        self.hum.configure(text=hum_text + "  (tonal interference only; not ENF analysis)")
 
 
 class RecurrenceTab(ttk.Frame):

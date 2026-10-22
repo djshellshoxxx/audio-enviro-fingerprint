@@ -13,6 +13,7 @@ import math
 import numpy as np
 
 from .control import check_cancelled
+from .validation import validate_frames
 
 METHOD = "recurrence-v1"
 CONFOUNDERS = ("Similar features can arise from a shared noise source (HVAC, mains hum) in "
@@ -39,6 +40,7 @@ class Recurrence:
 
 def frame_vectors(analysis) -> tuple[np.ndarray, list[str]]:
     """Normalized per-frame feature matrix (frames x features) and feature names."""
+    validate_frames(analysis)
     names = ["rms_dbfs", "log2_centroid_hz", "spectral_flatness"]
     band_names = sorted(analysis.frames[0].band_power_db) if analysis.frames else []
     names += [f"band_power_db.{b}" for b in band_names]
