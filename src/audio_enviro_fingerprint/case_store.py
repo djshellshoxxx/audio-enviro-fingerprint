@@ -97,7 +97,7 @@ class CaseStore:
         self.evidence_record(evidence_id)
         cursor = self.connection.execute(
             "INSERT INTO reference_records(evidence_id,metadata_json,review_json,created_utc) VALUES(?,?,?,?)",
-            (evidence_id, json.dumps(metadata, sort_keys=True), json.dumps(review, sort_keys=True),
+            (evidence_id, json.dumps(metadata, sort_keys=True, allow_nan=False), json.dumps(review, sort_keys=True, allow_nan=False),
              datetime.now(timezone.utc).isoformat()))
         self.connection.commit()
         return int(cursor.lastrowid)

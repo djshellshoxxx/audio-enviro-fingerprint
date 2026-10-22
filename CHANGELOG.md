@@ -16,6 +16,7 @@
 - Comparisons use `comparison-symmetric-v2`; swapping recordings no longer changes the score. Earlier thresholds require re-evaluation.
 
 ### Fixed
+- Acquisition reviews validate UTC/height/repeat values and detect positive 8-bit full-scale clipping; reference JSON rejects NaN/Infinity.
 - GUI exports protect the active case database and filesystem aliases.
 - Reports recheck evidence integrity at export; hashing/serialization run off the UI thread with cooperative cancellation.
 - Release errors cannot trigger automatic replacement of existing artifacts.

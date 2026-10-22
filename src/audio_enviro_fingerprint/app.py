@@ -175,7 +175,7 @@ class FingerprinterApp(tk.Tk):
 
     def _finish(self, kind, payload):
         self.busy = False
-        self.cancel_button.configure(state="disabled")
+        self.cancel_button.configure(state="disabled", text="Cancel analysis")
         self.progress.pack_forget()
         self.progress_label.pack_forget()
         if kind in ("error", "export_error") and isinstance(payload, AnalysisCancelled):
@@ -321,6 +321,7 @@ class FingerprinterApp(tk.Tk):
         self.cancel_button.configure(state="normal")
         self.progress.configure(value=0)
         self.progress.pack(fill="x", pady=(4, 0), before=self.notebook)
+        self.cancel_button.configure(text="Cancel export")
         self.progress_label.configure(text="Verifying evidence and exporting report")
         self.progress_label.pack(anchor="w", before=self.notebook)
 

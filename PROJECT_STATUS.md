@@ -46,3 +46,8 @@ This project is not feature complete. SPECIFICATIONS_V2.md supplements the origi
 - Scientific field calibration, streaming decode, and future research methods
   remain explicitly unfinished; a successful software build does not complete
   those research requirements.
+
+Required provenance-contract review also corrected semantic UTC/height/repeat
+validation, positive 8-bit clipping detection, and nonfinite reference JSON
+storage, with focused regression coverage. These checks establish metadata
+well-formedness only; they do not verify operator claims or calibrate methods.

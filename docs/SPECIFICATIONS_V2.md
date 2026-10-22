@@ -33,7 +33,7 @@ Supplements `SPECIFICATIONS.md`. All methods are descriptive and unvalidated for
 
 **Multichannel.** Per channel: RMS/peak dBFS and an independent fingerprint. Channel 1 vs k: zero-lag correlation (negative = opposite polarity), peak cross-correlation lag within ±1.5 ms (FFT), level difference, side-to-mid ratio.
 
-**Reference acquisition.** Required fields: location id, UTC time, operator, recorder, microphone, input chain, channel assignment, placement, orientation, height, source signal, occupancy/activity, authority/consent. Checks: required metadata (fail), duration (≥60 s pass, ≥20 s warn), sample rate (≥32 kHz pass, ≥16 kHz warn), clipping (>0.1 % full-scale samples fail), level, repeats, calibration (warn). Overall = worst status. Records are append-only in SQLite and bound to the evidence SHA-256. A self-reported label never produces a match.
+**Reference acquisition.** Required fields: location id, UTC time, operator, recorder, microphone, input chain, channel assignment, placement, orientation, height, source signal, occupancy/activity, authority/consent. Checks: required metadata (fail), duration (≥60 s pass, ≥20 s warn), sample rate (≥32 kHz pass, ≥16 kHz warn), clipping (>0.1 % samples at absolute level ≥0.991 fail, including 8-bit positive full scale), level, repeats, calibration (warn). Overall = worst status. Records are append-only in SQLite and bound to the evidence SHA-256. A self-reported label never produces a match.
 
 **Manual markers.** Append-only revisions `(marker_key, revision)`; deletion is a tombstone revision; history is exportable.
 
@@ -89,3 +89,9 @@ See BENCHMARK_PROTOCOL.md for the ported synthetic benchmark and the outstanding
 Report writing rechecks the evidence SHA-256 before export. GUI report and PNG
 export destinations also reject the active case database and its filesystem
 aliases, preventing accidental loss of notes and acquisition records.
+
+Reference metadata review validates an ISO 8601 UTC capture timestamp, a finite
+nonnegative height in meters, textual required fields, and positive integer
+repeat numbers no greater than the planned total. Incomplete or invalid fields
+produce failed review checks and remain visible if an examiner deliberately
+saves a failed reference. Acquisition JSON storage rejects nonfinite numbers.

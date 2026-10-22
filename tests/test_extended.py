@@ -148,6 +148,8 @@ class ReferenceAndStoreTests(unittest.TestCase):
                                                       "microphone_make_model", "input_chain", "channel_assignment",
                                                       "placement", "orientation", "height_m", "source_signal",
                                                       "occupancy_activity", "authority_or_consent", "calibration")})
+        full.recorded_utc = "2026-10-22T12:00:00Z"
+        full.height_m = "1.2"
         full.repeat_number = 3
         self.assertEqual(review_reference(full, tone(300, 70, 0.1, 48000), 48000)["overall"], "pass")
 
