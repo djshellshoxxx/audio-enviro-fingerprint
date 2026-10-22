@@ -1,39 +1,21 @@
 # Project status
 
-## Current phase
+## Implementation baseline
 
-Initial beta implementation and platform packaging. Repository was empty at start; this branch bootstraps the application.
+Development continues from `claude/intelligent-darwin-gmqz81` (5b8a216), which contains the v0.2 implementation absent from main. Implemented: PCM/float/extensible/RF64 WAV decoding, per-channel fingerprints and spatial metrics, candidate transitions and recurrence, reference acquisition and quality review, append-only markers and notes, musical and mains-hum descriptors, spectrogram PNG, CLI, GUI tabs, and manifest-bearing reports.
 
-## Verified locally
+## Completion audit — 2026-10-22
 
-- PCM WAV integer decoding for supported format widths; analysis uses channel 1.
-- SHA-256 for source bytes and versioned canonical acoustic features are separate.
-- Framewise RMS, spectral centroid, flatness, and fixed-band power descriptors.
-- Candidate transitions with visible per-feature deltas.
-- Version-checked, explainable whole-recording fingerprint comparison.
-- Experimental Schroeder decay-slope estimator for impulse responses.
-- Timestamped SQLite notes bound to the source SHA-256.
-- Tk desktop interface and JSON report export.
-- Linux source-level test suite: 30 tests pass; Tk GUI smoke test passes under xvfb (v0.2.0). See SPECIFICATIONS_V2.md.
+Added regression coverage and fixes for forged extensible subtype GUIDs, inconsistent WAV block alignment/byte rate, truncated RF64 metadata, unsupported report manifest algorithms, malformed report JSON, and nonfinite recurrence settings.
 
-## Scientific validation status
+The unit suite uses synthetic signals; passing it does not establish scientific calibration. Local Tk is importable, but no display/Xvfb is available for GUI smoke testing. Platform bundles require the Windows/Linux/macOS CI matrix.
 
-Not forensically validated. Tests currently use synthetic signals and basic integrity cases. Comparison score and transition threshold are heuristic. No location attribution, authenticity conclusion, ENF, learned classifier, controlled reference acquisition, or recurrence analysis is implemented.
+## Remaining work
 
-## Beta limitations
+- Compressed audio decoding with decoder provenance.
+- Bounded-memory analysis, cancellation, progress and performance verification on large recordings.
+- Representative field benchmark acquisition and scientific calibration.
+- ENF time series, scene/event classification, reflection analysis, robustness exploration, blind comparisons, and broader case reconstruction remain future research features in docs/FUTURE_FEATURES.md.
+- Code signing/notarization and Intel macOS builds remain unavailable.
 
-- PCM WAV only; no compressed audio or RF64.
-- Only channel 1 is analyzed.
-- Full WAV is decoded into memory.
-- Tk GUI has not been interactively exercised in this headless environment.
-- Windows executable can only be built and smoke-tested on Windows CI/host.
-- Known-location acquisition and environment recurrence detection remain TODO.
-
-## Next milestones
-
-1. Finish source audit, edge-case QA, and test suite.
-2. Run separate Windows/Linux CI package builds and inspect artifacts.
-3. Add or repair features based on CI, then verify launch behavior on both platforms.
-4. Develop representative acoustic benchmark protocol and data before treating any score as evidence.
-5. Implement the three requested distinctive future features with separate specifications and validation records.
-
+This project is not feature complete. SPECIFICATIONS_V2.md supplements the original beta specification; older documentation must not be read as a current inventory.

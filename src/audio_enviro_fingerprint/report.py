@@ -36,10 +36,18 @@ def write_report(path: str | Path, report: dict) -> None:
 def verify_report(path: str | Path, check_evidence: bool = True) -> dict:
     """Recompute the manifest and (optionally) the evidence file hash."""
     report = json.loads(Path(path).read_text(encoding="utf-8"))
-    manifest = report.get("manifest") or {}
+    if not isinstance(report, dict) or report.get("schema_version") != SCHEMA:
+        raise ValueError("Unsupported or malformed report schema")
+    manifest = report.get("manifest")
+    evidence = report.get("evidence")
+    if not isinstance(manifest, dict) or not isinstance(evidence, dict):
+        raise ValueError("Report requires manifest and evidence objects")
+    if not isinstance(evidence.get("source_path"), str) or not isinstance(evidence.get("sha256"), str):
+        raise ValueError("Report evidence requires a source path and SHA-256")
     body = {k: v for k, v in report.items() if k != "manifest"}
     actual = hashlib.sha256(_canonical(body)).hexdigest()
-    result = {"manifest_ok": actual == manifest.get("body_sha256"), "evidence_checked": False,
+    result = {"manifest_ok": (manifest.get("algorithm") == "sha256-canonical-json"
+                              and actual == manifest.get("body_sha256")), "evidence_checked": False,
               "evidence_ok": None}
     source = Path(report.get("evidence", {}).get("source_path", ""))
     if check_evidence and source.is_file():

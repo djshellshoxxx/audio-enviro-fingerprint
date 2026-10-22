@@ -61,7 +61,8 @@ def find_recurrences(analysis, other=None, threshold: float = 0.25, departure: f
     With ``other`` given, every frame of ``analysis`` is matched against ``other``
     (no departure requirement; cross-recording matches are reported as-is).
     """
-    if threshold <= 0 or departure <= threshold or min_gap_seconds < 0:
+    if (not all(math.isfinite(v) for v in (threshold, departure, min_gap_seconds))
+            or threshold <= 0 or departure <= threshold or min_gap_seconds < 0):
         raise ValueError("Require 0 < threshold < departure and nonnegative gap")
     if not analysis.frames:
         return []

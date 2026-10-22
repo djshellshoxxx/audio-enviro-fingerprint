@@ -79,7 +79,9 @@ def _parse_riff(data: bytes) -> tuple[dict, bytes, int]:
         cid = data[pos:pos + 4]
         size = struct.unpack_from("<I", data, pos + 4)[0]
         body = pos + _MAX_CHUNK_HEADER
-        if cid == b"ds64" and size >= 24:
+        if cid == b"ds64":
+            if size < 28 or body + size > len(data):
+                raise ValueError("Corrupt RF64 ds64 chunk")
             riff_size, data_size, _sample_count = struct.unpack_from("<QQQ", data, body)
             rf64_sizes = {"data": data_size}
         if cid == b"data" and size == 0xFFFFFFFF and "data" in rf64_sizes:
@@ -87,11 +89,19 @@ def _parse_riff(data: bytes) -> tuple[dict, bytes, int]:
         if cid == b"fmt ":
             if size < 16 or body + size > len(data):
                 raise ValueError("Corrupt fmt chunk")
-            tag, ch, rate, _brate, _align, bits = struct.unpack_from("<HHIIHH", data, body)
+            tag, ch, rate, byte_rate, align, bits = struct.unpack_from("<HHIIHH", data, body)
             if tag == _FMT_EXTENSIBLE:
-                if size < 40:
+                if size < 40 or struct.unpack_from("<H", data, body + 16)[0] < 22:
                     raise ValueError("Corrupt WAVE_FORMAT_EXTENSIBLE chunk")
-                tag = struct.unpack_from("<H", data, body + 24)[0]
+                subtype = data[body + 24:body + 40]
+                if subtype[4:] != bytes.fromhex("00001000800000aa00389b71"):
+                    raise ValueError("Unsupported extensible audio subtype GUID")
+                tag = struct.unpack_from("<I", subtype)[0]
+                valid_bits = struct.unpack_from("<H", data, body + 18)[0]
+                if not 0 < valid_bits <= bits:
+                    raise ValueError("Invalid extensible valid-bit count")
+            if bits % 8 or align != ch * (bits // 8) or byte_rate != rate * align:
+                raise ValueError("Inconsistent WAV block alignment or byte rate")
             fmt = {"tag": tag, "channels": ch, "rate": rate, "bits": bits}
         elif cid == b"data":
             declared = size
