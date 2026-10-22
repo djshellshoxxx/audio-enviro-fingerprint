@@ -178,7 +178,13 @@ class FingerprinterApp(tk.Tk):
         self.cancel_button.configure(state="disabled")
         self.progress.pack_forget()
         self.progress_label.pack_forget()
-        if kind == "error" and isinstance(payload, AnalysisCancelled):
+        if kind in ("error", "export_error") and isinstance(payload, AnalysisCancelled):
+            return
+        if kind == "export_done":
+            messagebox.showinfo("Export complete", f"Report with manifest written to {payload}")
+            return
+        if kind == "export_error":
+            messagebox.showerror("Export failed", str(payload))
             return
         if kind == "error":
             messagebox.showerror("Unable to analyze recording", str(payload))
@@ -290,27 +296,45 @@ class FingerprinterApp(tk.Tk):
                   style="Sub.TLabel").pack(anchor="w", padx=12, pady=(0, 10))
 
     def export_json(self):
-        if not self._require():
+        if self.busy or not self._require():
             return
         target = filedialog.asksaveasfilename(title="Export report", defaultextension=".json",
                                               filetypes=[("JSON report", "*.json")])
         if not target:
             return
         try:
-            from .integrity import sha256_file
-            if sha256_file(self.result["path"]) != self.result["sha256"]:
-                raise ValueError("The source file no longer matches the hash recorded at import.")
             from .pipeline import report_sections
-            from .report import build_report
             sections = report_sections(self.result, self.store.notes_for(self.evidence_id),
                                        self.store.markers_for(self.evidence_id),
                                        marker_history=self.store.markers_for(self.evidence_id, True),
                                        references=[r for r in self.store.references()
                                                    if r["evidence_id"] == self.evidence_id])
-            write_report(target, build_report(self.result["path"], self.result["sha256"], sections))
-            messagebox.showinfo("Export complete", f"Report with manifest written to {target}")
+            self._start_report_export(target, self.result["path"], self.result["sha256"], sections)
         except Exception as exc:
             messagebox.showerror("Export failed", str(exc))
+
+    def _start_report_export(self, target, source, digest, sections):
+        """Snapshot SQLite values on Tk's thread; hash/serialize/write off-thread."""
+        protected_paths = (self.store.path,)
+        self.busy = True
+        self.cancel_event.clear()
+        self.cancel_button.configure(state="normal")
+        self.progress.configure(value=0)
+        self.progress.pack(fill="x", pady=(4, 0), before=self.notebook)
+        self.progress_label.configure(text="Verifying evidence and exporting report")
+        self.progress_label.pack(anchor="w", before=self.notebook)
+
+        def work():
+            try:
+                from .report import build_report
+                report = build_report(source, digest, sections)
+                write_report(target, report, protected_paths=protected_paths,
+                             should_cancel=self.cancel_event.is_set)
+                self.jobs.put(("export_done", target))
+            except Exception as exc:
+                self.jobs.put(("export_error", exc))
+        threading.Thread(target=work, daemon=True).start()
+        self.after(50, self._poll)
 
     def export_png(self):
         if not self._require():
@@ -320,7 +344,8 @@ class FingerprinterApp(tk.Tk):
         if target:
             try:
                 from .integrity import write_export
-                write_export(target, self.spectrogram.png_bytes, self.result["path"])
+                write_export(target, self.spectrogram.png_bytes, self.result["path"],
+                             protected_paths=(self.store.path,))
             except (ValueError, OSError) as exc:
                 messagebox.showerror("Export failed", str(exc))
 
@@ -408,6 +433,37 @@ def _smoke(app: FingerprinterApp) -> None:
         if not app.spectrogram.png_bytes or app.result is None:
             raise RuntimeError("smoke analysis produced no output")
         app.update()
+        # Exercise persistence and exports in the packaged runtime, while the
+        # synthetic source still exists for evidence-hash verification.
+        app.store.add_note(app.evidence_id, 1.0, "Smoke observation", "Synthetic test only")
+        app.store.save_marker(app.evidence_id, 2.0, "Synthetic transition")
+        app._load_notes()
+        from .report import verify_report
+        report_path = Path(tmp) / "report.json"
+        from .pipeline import report_sections
+        import time
+        errors = []
+        original_info, original_error = messagebox.showinfo, messagebox.showerror
+        messagebox.showinfo = lambda *args, **kwargs: None
+        messagebox.showerror = lambda *args, **kwargs: errors.append(args)
+        try:
+            app._start_report_export(report_path, path, app.result["sha256"],
+                report_sections(app.result, app.store.notes_for(app.evidence_id),
+                                app.store.markers_for(app.evidence_id)))
+            deadline = time.monotonic() + 30
+            while app.busy and time.monotonic() < deadline:
+                app.update()
+                time.sleep(0.01)
+            if app.busy or errors:
+                raise RuntimeError(f"background export failed or timed out: {errors}")
+        finally:
+            messagebox.showinfo, messagebox.showerror = original_info, original_error
+        verification = verify_report(report_path)
+        if not verification["manifest_ok"] or not verification["evidence_ok"]:
+            raise RuntimeError("smoke export failed integrity verification")
+        for tab_id in app.notebook.tabs():
+            app.notebook.select(tab_id)
+            app.update_idletasks()
     print("smoke test ok")
 
 

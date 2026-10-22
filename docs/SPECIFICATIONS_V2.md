@@ -56,11 +56,11 @@ Tabs: Analysis (timeline with transitions and recurrence spans), Spectrogram (cl
 
 ## Packaging and release
 
-CI matrix: ubuntu-24.04 (tar.gz), windows-latest (zip), macos-latest/arm64 (zip of `.app`). Each job: unit tests → PyInstaller → packaged smoke test → archive → artifact. A tag `v*` triggers the `release` job (SHA256SUMS + GitHub Release; tags containing `-beta/-rc/-alpha` are prereleases). Builds are unsigned.
+CI matrix: ubuntu-24.04 (tar.gz), windows-latest (zip), macos-15/arm64 and macos-15-intel/x86_64 (zip of `.app`). Each job: unit tests → PyInstaller → packaged smoke test → archive → artifact. A tag `v*` triggers the `release` job (SHA256SUMS + GitHub Release; tags containing `-beta/-rc/-alpha` are prereleases). Builds are unsigned.
 
 ## Known gaps
 
-Full streaming decode is not implemented; whole file decoded in memory; no code signing/notarization; Intel macOS not built; thresholds uncalibrated; ENF, scene classification, and learned models not implemented.
+Full streaming decode is not implemented; whole file decoded in memory; no code signing/notarization; Intel macOS built by a dedicated native CI target; thresholds uncalibrated; ENF, scene classification, and learned models not implemented.
 
 ## Completion audit additions — 2026-10-22
 
@@ -85,3 +85,7 @@ The active application retains v0.2 musical/hum/spectrogram UI modules while por
 Reference quality review additionally includes the older branch's DC-offset and silent-block/dropout checks. GUI reports include acquisition records and full marker revision history alongside current markers. Failed imports retain the previous evidence binding, preventing subsequent notes from attaching to a rejected file.
 
 See BENCHMARK_PROTOCOL.md for the ported synthetic benchmark and the outstanding field-data protocol. Broader legacy branch consolidation is not complete; incompatible segmentation, stores and GUI variants require deliberate comparison before integration.
+
+Report writing rechecks the evidence SHA-256 before export. GUI report and PNG
+export destinations also reject the active case database and its filesystem
+aliases, preventing accidental loss of notes and acquisition records.

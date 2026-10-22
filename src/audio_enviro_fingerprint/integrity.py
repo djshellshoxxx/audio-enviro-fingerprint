@@ -15,7 +15,8 @@ def sha256_file(path: str | Path, chunk_size: int = 1024 * 1024, *, should_cance
     return digest.hexdigest()
 
 
-def write_export(path: str | Path, payload: bytes, source_path: str | Path) -> None:
+def write_export(path: str | Path, payload: bytes, source_path: str | Path, *,
+                 protected_paths: tuple[str | Path, ...] = ()) -> None:
     """Atomically publish an export while refusing the source and its aliases.
 
     Replacing a directory entry rather than opening the destination for writing
@@ -25,8 +26,9 @@ def write_export(path: str | Path, payload: bytes, source_path: str | Path) -> N
     import tempfile
 
     target, source = Path(path), Path(source_path)
-    if target.resolve() == source.resolve() or (target.exists() and source.exists() and target.samefile(source)):
-        raise ValueError('Export destination must not overwrite original evidence')
+    for protected in (source, *(Path(item) for item in protected_paths)):
+        if target.resolve() == protected.resolve() or (target.exists() and protected.exists() and target.samefile(protected)):
+            raise ValueError("Export destination must not overwrite evidence or the case database")
     scratch = None
     try:
         with tempfile.NamedTemporaryFile(dir=target.parent, prefix='.aefp-export-', delete=False) as out:

@@ -40,7 +40,10 @@ class VerificationHardeningTests(unittest.TestCase):
         from audio_enviro_fingerprint.report import build_report, verify_report, write_report
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / 'r.json'
-            report = build_report('missing.wav', '0' * 64, {})
+            source = Path(tmp) / 'source.wav'
+            source.write_bytes(b'evidence')
+            from audio_enviro_fingerprint.integrity import sha256_file
+            report = build_report(source, sha256_file(source), {})
             report['manifest']['algorithm'] = 'unsupported'
             write_report(p, report)
             self.assertFalse(verify_report(p)['manifest_ok'])

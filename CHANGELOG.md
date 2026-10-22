@@ -1,8 +1,10 @@
 # Changelog
 
-## 0.3.0b1 — development
+## 0.3.0b1 — release candidate
 
 ### Added
+- Native Intel macOS release target alongside Apple silicon, Windows and Linux.
+- Packaged GUI smoke verifies background report export, source/manifest hashes and SQLite notes/markers.
 - Optional local FFmpeg compressed-input decoding with codec/version provenance and size/time limits.
 - Cooperative analysis cancellation and linear-memory recurrence queries.
 - Transparent multi-recording descriptor grouping and deterministic synthetic benchmark commands.
@@ -14,6 +16,9 @@
 - Comparisons use `comparison-symmetric-v2`; swapping recordings no longer changes the score. Earlier thresholds require re-evaluation.
 
 ### Fixed
+- GUI exports protect the active case database and filesystem aliases.
+- Reports recheck evidence integrity at export; hashing/serialization run off the UI thread with cooperative cancellation.
+- Release errors cannot trigger automatic replacement of existing artifacts.
 - Exports cannot overwrite source evidence or its aliases and are written atomically.
 - Reject malformed WAV subtype/block metadata, truncated RF64 metadata, unsupported report algorithms and malformed report objects.
 - Reject nonfinite recurrence settings and timestamps; marker revisions cannot switch evidence ownership.

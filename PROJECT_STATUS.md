@@ -8,7 +8,7 @@ Development continues from `claude/intelligent-darwin-gmqz81` (5b8a216), which c
 
 Added regression coverage and fixes for forged extensible subtype GUIDs, inconsistent WAV block alignment/byte rate, truncated RF64 metadata, unsupported report manifest algorithms, malformed report JSON, and nonfinite recurrence settings.
 
-The unit suite uses synthetic signals; passing it does not establish scientific calibration. Local Tk is importable, but no display/Xvfb is available for GUI smoke testing. Platform bundles require the Windows/Linux/macOS CI matrix.
+The unit suite uses synthetic signals; passing it does not establish scientific calibration. Local Tk GUI smoke has passed with a user-space Xvfb display, exercising synthetic analysis and all tabs. Platform bundles require the Windows/Linux/macOS CI matrix.
 
 ## Additional implemented work
 
@@ -28,6 +28,21 @@ The unit suite uses synthetic signals; passing it does not establish scientific 
 - Representative field benchmark acquisition and scientific calibration (synthetic benchmark is implemented).
 - Reconcile remaining incompatible modules and UI behavior from older branches before declaring repository completion.
 - ENF time series, scene/event classification, reflection analysis, robustness exploration, blind comparisons, and broader case reconstruction remain future research features in docs/FUTURE_FEATURES.md.
-- Code signing/notarization and Intel macOS builds remain unavailable.
+- Code signing/notarization remains unavailable. Intel macOS now has a dedicated native CI job; build results must be checked before claiming a released binary.
 
 This project is not feature complete. SPECIFICATIONS_V2.md supplements the original beta specification; older documentation must not be read as a current inventory.
+
+## Cloud release preparation — 2026-10-22
+
+- Reused the existing completion-audit branch rather than rebuilding features
+  already implemented outside main.
+- Report exports now recheck source integrity immediately before writing, and
+  GUI report/PNG exports protect the active SQLite case database and aliases.
+- Added regression tests for protected database paths and changed evidence.
+- Expanded packaged GUI smoke to persist notes/markers, verify an exported
+  report against its source, and select every notebook tab.
+- Added Intel macOS to the native matrix and removed error-driven asset
+  replacement; publishing an existing tag fails without clobbering artifacts.
+- Scientific field calibration, streaming decode, and future research methods
+  remain explicitly unfinished; a successful software build does not complete
+  those research requirements.

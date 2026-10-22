@@ -29,9 +29,14 @@ def build_report(source_path: str | Path, evidence_sha256: str, sections: dict) 
                                  "body_sha256": hashlib.sha256(_canonical(body)).hexdigest()}}
 
 
-def write_report(path: str | Path, report: dict) -> None:
+def write_report(path: str | Path, report: dict, *, protected_paths=(), should_cancel=None) -> None:
     payload = (json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
-    write_export(path, payload, report["evidence"]["source_path"])
+    source = report["evidence"]["source_path"]
+    if sha256_file(source, should_cancel=should_cancel) != report["evidence"]["sha256"]:
+        raise ValueError("Evidence changed since analysis; reopen a stable copy before export")
+    from .control import check_cancelled
+    check_cancelled(should_cancel)
+    write_export(path, payload, source, protected_paths=protected_paths)
 
 
 def verify_report(path: str | Path, check_evidence: bool = True) -> dict:
