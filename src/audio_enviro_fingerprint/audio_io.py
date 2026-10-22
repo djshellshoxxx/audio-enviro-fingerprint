@@ -23,6 +23,7 @@ class AudioData:
     source_width_bytes: int
     all_channels: np.ndarray | None = field(default=None, repr=False, compare=False)
     sample_format: str = "pcm"
+    decoder: dict = field(default_factory=lambda: {"name": "aefp-wav", "version": "1"}, compare=False)
 
     @property
     def duration_seconds(self) -> float:
@@ -140,3 +141,22 @@ def load_wav(path: str | Path) -> AudioData:
     # deterministically; the original multichannel file remains untouched.
     return AudioData(audio[:, 0], rate, channels, width, audio,
                      "float" if tag == _FMT_FLOAT else "pcm")
+
+
+def load_audio(path: str | Path, max_decoded_bytes: int = 512 * 1024 * 1024) -> AudioData:
+    """Read WAV natively or supported compressed audio through local FFmpeg.
+
+    The compressed decode limit applies to float64 interleaved sample bytes.
+    Original bytes remain untouched and are hashed by the analysis pipeline.
+    """
+    if not isinstance(max_decoded_bytes, int) or max_decoded_bytes <= 0:
+        raise ValueError("Decoded byte limit must be a positive integer")
+    path = Path(path).resolve(strict=True)
+    if not path.is_file():
+        raise ValueError("Audio input must be a regular local file")
+    with path.open("rb") as source:
+        header = source.read(12)
+    if header[:4] in (b"RIFF", b"RF64") or path.suffix.lower() in (".wav", ".wave"):
+        return load_wav(path)
+    from .codec_io import decode_compressed
+    return decode_compressed(path, max_decoded_bytes)

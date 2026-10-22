@@ -60,4 +60,16 @@ CI matrix: ubuntu-24.04 (tar.gz), windows-latest (zip), macos-latest/arm64 (zip 
 
 ## Known gaps
 
-No compressed-audio decode; whole file decoded in memory; no code signing/notarization; Intel macOS not built; thresholds uncalibrated; ENF, scene classification, and learned models not implemented.
+Full streaming decode is not implemented; whole file decoded in memory; no code signing/notarization; Intel macOS not built; thresholds uncalibrated; ENF, scene classification, and learned models not implemented.
+
+## Completion audit additions — 2026-10-22
+
+`load_audio` selects the strict native WAV parser for RIFF/RF64/WAV; other supported local files use the optional FFmpeg decoder. Its codec provenance is exported under `sections.audio.decoder`. No shell is used; protocol and demuxer allowlists exclude network and playlist inputs. A bounded temporary raw float file is removed on success or error. The decoded size cap fails closed rather than returning a partial recording.
+
+Recurrence computes one query column at a time: linear working memory in frame count (time remains quadratic). Existing distances, thresholds and result semantics are preserved.
+
+`analyze_file(..., cancel_event=threading.Event())` raises `AnalysisCancelled` and returns no partial result. GUI Cancel sets the event; the last completed analysis remains visible. Checkpoints cover stage boundaries and hashing/frame/recurrence loops. Decoder and musical stages are not immediately interruptible.
+
+Report and spectrogram exports use atomic replacement and reject destinations resolving to the source or sharing its inode. Marker revisions cannot change evidence ownership. Note and marker timestamps must be finite and nonnegative.
+
+Implementation references: [FFmpeg stream selection and options](https://ffmpeg.org/ffmpeg.html), [ffprobe JSON output and stream metadata](https://ffmpeg.org/ffprobe.html).

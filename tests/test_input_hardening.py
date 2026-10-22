@@ -61,3 +61,49 @@ class RecurrenceValidationTests(unittest.TestCase):
                        {'min_gap_seconds': float('nan')}):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 find_recurrences(analysis, **kwargs)
+
+class RecurrenceMemoryTests(unittest.TestCase):
+    def test_search_never_builds_all_pairs_matrix(self):
+        from unittest.mock import patch
+        import numpy as np
+        from audio_enviro_fingerprint.features import analyze_audio
+        from audio_enviro_fingerprint import recurrence
+        rng = np.random.default_rng(42)
+        room = rng.normal(0, 0.02, 16000 * 10)
+        analysis = analyze_audio(np.concatenate([room, tone(1500, 10), room]), 16000)
+        original = recurrence._distances
+
+        def bounded(a, b):
+            self.assertTrue(len(a) <= 1 or len(b) <= 1,
+                            'recurrence allocated a quadratic all-pairs distance matrix')
+            return original(a, b)
+
+        with patch.object(recurrence, '_distances', side_effect=bounded):
+            matches = recurrence.find_recurrences(analysis)
+            cross = recurrence.find_recurrences(analysis, analysis)
+        self.assertTrue(matches)
+        self.assertTrue(cross)
+
+class EvidenceExportTests(unittest.TestCase):
+    def test_report_cannot_overwrite_original_or_hardlink(self):
+        import hashlib
+        import os
+        from audio_enviro_fingerprint.report import build_report, write_report
+        with tempfile.TemporaryDirectory() as tmp:
+            src, alias = Path(tmp) / 'evidence.wav', Path(tmp) / 'alias.json'
+            src.write_bytes(b'original evidence')
+            os.link(src, alias)
+            report = build_report(src, hashlib.sha256(src.read_bytes()).hexdigest(), {})
+            for output in (src, alias):
+                with self.subTest(output=output), self.assertRaises(ValueError):
+                    write_report(output, report)
+            self.assertEqual(src.read_bytes(), b'original evidence')
+
+    def test_spectrogram_cannot_overwrite_original(self):
+        from audio_enviro_fingerprint.cli import run
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / 'evidence.wav'
+            write_wav(src, tone(440, 3))
+            original = src.read_bytes()
+            self.assertEqual(run(['spectrogram', str(src), str(src)]), 1)
+            self.assertEqual(src.read_bytes(), original)

@@ -12,6 +12,8 @@ import math
 
 import numpy as np
 
+from .control import check_cancelled
+
 METHOD = "recurrence-v1"
 CONFOUNDERS = ("Similar features can arise from a shared noise source (HVAC, mains hum) in "
                "different places.", "Level changes from gain or microphone distance can mimic departures.",
@@ -55,7 +57,7 @@ def _distances(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def find_recurrences(analysis, other=None, threshold: float = 0.25, departure: float = 0.6,
-                     min_gap_seconds: float = 6.0) -> list[Recurrence]:
+                     min_gap_seconds: float = 6.0, *, should_cancel=None) -> list[Recurrence]:
     """Find returns to an earlier environment.
 
     With ``other`` given, every frame of ``analysis`` is matched against ``other``
@@ -75,22 +77,24 @@ def find_recurrences(analysis, other=None, threshold: float = 0.25, departure: f
         vb, names_b = frame_vectors(other)
         if names != names_b:
             raise ValueError("Recordings use different band layouts; cannot compare")
-        dist = _distances(vb, va)            # rows: other frames, cols: analysis frames
     else:
-        vb, dist = va, _distances(va, va)
+        vb = va
     gap = max(1, math.ceil(min_gap_seconds / hop))
     matches = []                              # (j in analysis, i in reference, distance, depart)
     for j in range(len(va)):
+        check_cancelled(should_cancel)
         limit = len(vb) if cross else j - gap + 1
         if limit <= 0:
             continue
-        col = dist[:limit, j]
+        # Retain only one query column; an all-pairs tensor grows quadratically
+        # with recording length and can exhaust RAM before analysis completes.
+        col = _distances(vb[:limit], va[j:j + 1])[:, 0]
         i = int(np.argmin(col))
         if col[i] > threshold:
             continue
         peak = None
         if not cross:
-            between = dist[i, i + 1:j]
+            between = _distances(vb[i:i + 1], va[i + 1:j])[0]
             peak = float(between.max()) if between.size else 0.0
             if peak < departure:
                 continue

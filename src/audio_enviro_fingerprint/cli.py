@@ -18,11 +18,11 @@ def _build_parser() -> argparse.ArgumentParser:
                                      description="Explainable acoustic environment screening.")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command", required=True)
-    a = sub.add_parser("analyze", help="analyze a WAV and write a verifiable JSON report")
+    a = sub.add_parser("analyze", help="analyze an audio recording and write a verifiable JSON report")
     a.add_argument("wav")
     a.add_argument("-o", "--output", help="report path (default: stdout)")
     a.add_argument("--no-musical", action="store_true", help="skip key/tempo/pitch analysis")
-    c = sub.add_parser("compare", help="explainable comparison of two WAV files")
+    c = sub.add_parser("compare", help="explainable comparison of two audio recordings")
     c.add_argument("first")
     c.add_argument("second")
     r = sub.add_parser("recurrence", help="find where the second recording's environment appears in the first")
@@ -59,10 +59,10 @@ def run(argv: list[str]) -> int:
             found = find_recurrences(x["analysis"], y["analysis"])
             print(json.dumps([m.to_dict() for m in found], indent=2, allow_nan=False))
         elif args.command == "spectrogram":
-            from .audio_io import load_wav
-            audio = load_wav(args.wav)
-            with open(args.output, "wb") as out:
-                out.write(spectrogram_png(audio.samples, audio.sample_rate))
+            from .audio_io import load_audio
+            audio = load_audio(args.wav)
+            from .integrity import write_export
+            write_export(args.output, spectrogram_png(audio.samples, audio.sample_rate), args.wav)
         elif args.command == "verify":
             result = verify_report(args.report)
             print(json.dumps(result))

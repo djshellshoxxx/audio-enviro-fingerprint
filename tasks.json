@@ -38,8 +38,8 @@
     },
     {
       "id": "codec-support",
-      "status": "planned",
-      "title": "Add validated compressed audio decode with provenance tracking"
+      "status": "implemented",
+      "title": "Optional FFmpeg decoding with provenance, resource limits and FLAC/MP3 integration coverage"
     },
     {
       "id": "musical-analysis",
@@ -50,6 +50,16 @@
       "id": "cli-reports",
       "status": "implemented",
       "title": "CLI, spectrogram, manifest-verified reports, manual markers"
+    },
+    {
+      "id": "streaming-analysis",
+      "status": "planned",
+      "title": "Full streaming decode and large-recording field performance verification"
+    },
+    {
+      "id": "cooperative-cancellation",
+      "status": "implemented",
+      "title": "GUI cancellation with hashing/frame/recurrence checkpoints and no partial-result publication"
     }
   ]
 }

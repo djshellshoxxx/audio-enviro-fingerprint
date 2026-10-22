@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from . import __version__
-from .integrity import sha256_file
+from .integrity import sha256_file, write_export
 
 SCHEMA = "aefp-report-2"
 LIMITATIONS = ("Candidate transitions and recurrences are review aids, not findings.",
@@ -30,7 +30,8 @@ def build_report(source_path: str | Path, evidence_sha256: str, sections: dict) 
 
 
 def write_report(path: str | Path, report: dict) -> None:
-    Path(path).write_text(json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
+    payload = (json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
+    write_export(path, payload, report["evidence"]["source_path"])
 
 
 def verify_report(path: str | Path, check_evidence: bool = True) -> dict:

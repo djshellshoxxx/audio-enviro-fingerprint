@@ -10,10 +10,16 @@ Added regression coverage and fixes for forged extensible subtype GUIDs, inconsi
 
 The unit suite uses synthetic signals; passing it does not establish scientific calibration. Local Tk is importable, but no display/Xvfb is available for GUI smoke testing. Platform bundles require the Windows/Linux/macOS CI matrix.
 
+## Additional implemented work
+
+- Optional local FFmpeg decoding with first-stream selection, no downmix or resampling, decoder/version/codec provenance, restricted demuxers/protocols, timeout and decoded-size limits. FLAC and MP3 integration tests passed locally.
+- Atomic report/PNG exports refuse to overwrite evidence, including symlink and hardlink aliases.
+- Cooperative GUI cancellation retains the previous result and publishes no partial result. A running decode or musical analysis may finish its current stage before cancellation takes effect.
+- Marker revisions stay bound to their original evidence; nonfinite note/marker times are rejected.
+
 ## Remaining work
 
-- Compressed audio decoding with decoder provenance.
-- Bounded-memory analysis, cancellation, progress and performance verification on large recordings.
+- Full streaming decode and performance verification on large recordings. Recurrence now uses linear working memory; cooperative cancellation is implemented for hashing, frame extraction, recurrence and pipeline stage boundaries.
 - Representative field benchmark acquisition and scientific calibration.
 - ENF time series, scene/event classification, reflection analysis, robustness exploration, blind comparisons, and broader case reconstruction remain future research features in docs/FUTURE_FEATURES.md.
 - Code signing/notarization and Intel macOS builds remain unavailable.
