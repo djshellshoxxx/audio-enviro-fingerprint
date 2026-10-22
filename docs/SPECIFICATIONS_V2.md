@@ -56,7 +56,7 @@ Tabs: Analysis (timeline with transitions and recurrence spans), Spectrogram (cl
 
 ## Packaging and release
 
-CI matrix: ubuntu-24.04 (tar.gz), windows-latest (zip), macos-15/arm64 and macos-15-intel/x86_64 (zip of `.app`). Each job: unit tests → PyInstaller → packaged smoke test → archive → artifact. A tag `v*` triggers the `release` job (SHA256SUMS + GitHub Release; tags containing `-beta/-rc/-alpha` are prereleases). Builds are unsigned.
+CI matrix: ubuntu-24.04 (tar.gz), windows-latest (zip), macos-26/arm64 and macos-15-intel/x86_64 (zip of `.app`). Each job: unit tests → PyInstaller → packaged smoke test → archive → artifact. A tag `v*` triggers the `release` job (SHA256SUMS + GitHub Release; tags containing `-beta/-rc/-alpha` are prereleases). Builds are unsigned.
 
 ## Known gaps
 

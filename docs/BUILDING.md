@@ -52,7 +52,7 @@ build command above.
 ## Automated releases
 
 The native CI matrix builds Linux x86-64, Windows x86-64, macOS arm64
-(`macos-15`) and macOS x86-64 (`macos-15-intel`). Each job runs the complete
+(`macos-26`) and macOS x86-64 (`macos-15-intel`). Each job runs the complete
 unit suite and then the packaged GUI smoke workflow: synthetic stereo analysis,
 all tab selection, SQLite notes/markers, JSON export, and manifest/source-hash
 verification. A failed platform prevents release publication.
