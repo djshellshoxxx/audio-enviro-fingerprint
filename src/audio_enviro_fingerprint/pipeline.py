@@ -13,7 +13,8 @@ from .integrity import evidence_stat, sha256_file
 from .methods.hum import detect_mains_hum
 from .methods.musical import musical_summary
 from .multichannel import analyze_channels
-from .recurrence import CONFOUNDERS, find_recurrences
+from .recurrence import (CONFOUNDERS, METHOD, DEFAULT_THRESHOLD, DEFAULT_DEPARTURE,
+                         DEFAULT_MIN_GAP_SECONDS, find_recurrences)
 from .report import build_report
 from .transitions import detect_transitions
 
@@ -40,7 +41,12 @@ def analyze_file(path: str | Path, musical: bool = True, progress=None, cancel_e
     fingerprint = make_fingerprint(analysis)
     step("Detecting transitions and recurrence", 0.6)
     transitions = detect_transitions(analysis)
-    recurrences = find_recurrences(analysis, should_cancel=should_cancel)
+    recurrence_parameters = {"method": METHOD, "threshold": DEFAULT_THRESHOLD,
+                             "departure": DEFAULT_DEPARTURE, "min_gap_seconds": DEFAULT_MIN_GAP_SECONDS}
+    recurrences = find_recurrences(analysis, threshold=recurrence_parameters["threshold"],
+                                  departure=recurrence_parameters["departure"],
+                                  min_gap_seconds=recurrence_parameters["min_gap_seconds"],
+                                  should_cancel=should_cancel)
     step("Hum and channel analysis", 0.75)
     hum = detect_mains_hum(audio.samples, audio.sample_rate)
     channels = analyze_channels(audio) if audio.channels > 1 else None
@@ -55,7 +61,8 @@ def analyze_file(path: str | Path, musical: bool = True, progress=None, cancel_e
     step("Done", 1.0)
     return {"audio": audio, "analysis": analysis, "fingerprint": fingerprint, "transitions": transitions,
             "recurrences": recurrences, "hum": hum, "channels": channels, "musical": music,
-            "sha256": initial, "path": path, "source_stat": source_stat}
+            "sha256": initial, "path": path, "source_stat": source_stat,
+            "recurrence_parameters": recurrence_parameters}
 
 
 def report_sections(result: dict, notes: list | None = None, markers: list | None = None, *,
@@ -69,7 +76,8 @@ def report_sections(result: dict, notes: list | None = None, markers: list | Non
             "fingerprint": json.loads(result["fingerprint"].canonical_json),
             "fingerprint_sha256": result["fingerprint"].fingerprint_hash,
             "transitions": [asdict(t) for t in result["transitions"]],
-            "recurrences": {"method": "recurrence-v1", "items": [r.to_dict() for r in result["recurrences"]],
+            "recurrences": {"method": METHOD, "parameters": result.get("recurrence_parameters"),
+                            "items": [r.to_dict() for r in result["recurrences"]],
                             "confounders": list(CONFOUNDERS)},
             "mains_hum": result["hum"], "channels": result["channels"], "musical": result["musical"],
             "notes": notes or [], "markers": markers or [],

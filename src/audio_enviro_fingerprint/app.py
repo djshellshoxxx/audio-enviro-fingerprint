@@ -274,7 +274,7 @@ class FingerprinterApp(tk.Tk):
             if self.store.evidence_record(evidence_id)["sha256"] != result["sha256"]:
                 raise ValueError("The file changed while it was being loaded. Open a stable copy again.")
             self.store.save_recurrence_run(evidence_id,
-                {"method": "recurrence-v1", "threshold": 0.25, "departure": 0.6, "min_gap_seconds": 6.0},
+                result["recurrence_parameters"],
                 [r.to_dict() for r in result["recurrences"]])
         except Exception as exc:
             messagebox.showerror("Unable to load evidence", str(exc))

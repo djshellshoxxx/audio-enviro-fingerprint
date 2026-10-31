@@ -17,6 +17,9 @@ from .control import check_cancelled
 from .validation import validate_frames
 
 METHOD = "recurrence-v1"
+DEFAULT_THRESHOLD = 0.25
+DEFAULT_DEPARTURE = 0.6
+DEFAULT_MIN_GAP_SECONDS = 6.0
 CONFOUNDERS = ("Similar features can arise from a shared noise source (HVAC, mains hum) in "
                "different places.", "Level changes from gain or microphone distance can mimic departures.",
                "Distances are uncalibrated; a match is a review candidate, not an identification.")
@@ -59,8 +62,9 @@ def _distances(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.sqrt(np.mean(diff * diff, axis=2))
 
 
-def find_recurrences(analysis, other=None, threshold: float = 0.25, departure: float = 0.6,
-                     min_gap_seconds: float = 6.0, *, should_cancel=None) -> list[Recurrence]:
+def find_recurrences(analysis, other=None, threshold: float = DEFAULT_THRESHOLD,
+                     departure: float = DEFAULT_DEPARTURE,
+                     min_gap_seconds: float = DEFAULT_MIN_GAP_SECONDS, *, should_cancel=None) -> list[Recurrence]:
     """Find returns to an earlier environment.
 
     With ``other`` given, every frame of ``analysis`` is matched against ``other``
