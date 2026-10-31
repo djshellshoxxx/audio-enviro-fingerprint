@@ -46,3 +46,5 @@ Remaining external requirements: acquire the representative recordings specified
 ## Follow-on specification/audit/usability session
 
 Current authoritative acceptance and limitations: [DELIVERY_AUDIT.md](DELIVERY_AUDIT.md). Plan/ownership: [implementation plan](superpowers/plans/2026-10-30-spec-audit-usability.md). Current frozen-source suite: 128 PASS, no skips; wheel and Linux bundle + packaged GUI smoke PASS. Four bounded workers and independent final reviewer finished; all reviewed findings fixed, no additional cloud instances. Remote heads fetched; consolidation continues on `codex/spec-audit-usability`. Historical 83-test results above belong to the previous maintenance checkpoint.
+
+Final follow-up: minimum-window reachability corrected and independently reviewed; all ten fetched heads pass ancestry checks. Final suite: 129 tests PASS with actual Tk display, no skips. The source is frozen for the final Linux rebuild. No extra instances or external release were created.

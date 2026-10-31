@@ -184,3 +184,48 @@ class DesktopIntegrationTests(unittest.TestCase):
         import tkinter as tk
         windows=[w for w in self.app.winfo_children() if isinstance(w,tk.Toplevel)]
         self.assertEqual(len(windows),1)
+
+    def test_minimum_window_scrolls_to_every_review_table(self):
+        self.app.geometry('900x600')
+        self.app.deiconify()
+        self.app.quick_analysis.set(True)
+        self.app.start_analysis(self.source)
+        self.finish_jobs()
+        targets = [(self.app.notebook.tabs()[0],self.app.features),
+                   (self.app.notes_tab,self.app.markers_view),
+                   (self.app.reference,self.app.reference.checks),
+                   (self.app.musical,self.app.musical.hum),
+                   (self.app.recurrence,self.app.recurrence.view),
+                   (self.app.channels,self.app.channels.pairs)]
+        for tab_id,target in targets:
+            with self.subTest(target=str(target)):
+                self.app.notebook.select(tab_id)
+                self.app.update()
+                tab=self.app.nametowidget(str(tab_id))
+                canvas=getattr(tab,'scroll_canvas',None)
+                self.assertIsNotNone(canvas,'Review tabs must expose a scrollable viewport at minimum size')
+                canvas.focus_force()
+                canvas.event_generate('<End>')
+                self.app.update()
+                viewport_top=canvas.winfo_rooty()
+                viewport_bottom=viewport_top+canvas.winfo_height()
+                target_bottom=target.winfo_rooty()+target.winfo_height()
+                self.assertLessEqual(target_bottom,viewport_bottom+2)
+                self.assertGreater(target_bottom,viewport_top)
+                self.assertLessEqual(target.winfo_rootx()+target.winfo_width(),canvas.winfo_rootx()+canvas.winfo_width()+2)
+                canvas.event_generate('<Home>')
+                self.app.update()
+                self.assertAlmostEqual(canvas.yview()[0],0.0)
+        self.app.notebook.select(self.app.notes_tab)
+        self.app.update()
+        self.app.markers_view.focus_force()
+        self.app.update()
+        canvas=self.app.notes_tab.scroll_canvas
+        self.assertLessEqual(self.app.markers_view.winfo_rooty()+self.app.markers_view.winfo_height(),
+                             canvas.winfo_rooty()+canvas.winfo_height()+2)
+        self.app.notebook.select(self.app.reference)
+        self.app.update()
+        canvas=self.app.reference.scroll_canvas
+        for entry in self.app.reference.entries.values():
+            self.assertGreaterEqual(entry.winfo_rootx(),canvas.winfo_rootx())
+            self.assertLessEqual(entry.winfo_rootx()+entry.winfo_width(),canvas.winfo_rootx()+canvas.winfo_width())

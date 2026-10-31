@@ -73,7 +73,7 @@
     },
     {
       "id": "branch-reconciliation",
-      "status": "INTEGRATING",
+      "status": "DONE",
       "title": "Adapt compatible branch work and preserve superseded alternatives in consolidated history",
       "record": "docs/BRANCH_RECONCILIATION.md"
     },
@@ -90,7 +90,7 @@
         "beta-core"
       ],
       "contracts": "docs/SPECIFICATIONS_V2.md",
-      "acceptance": "128 tests pass without skips; source and packaged Linux GUI smoke pass",
+      "acceptance": "129 tests pass without skips; source and packaged Linux GUI smoke pass",
       "workspace": "codex/spec-audit-usability",
       "handoff": "docs/DELIVERY_AUDIT.md"
     },
@@ -108,7 +108,7 @@
         "beta-core"
       ],
       "contracts": "docs/SPECIFICATIONS_V2.md",
-      "acceptance": "128 tests pass without skips; source and packaged Linux GUI smoke pass",
+      "acceptance": "129 tests pass without skips; source and packaged Linux GUI smoke pass",
       "workspace": "codex/spec-audit-usability",
       "handoff": "docs/DELIVERY_AUDIT.md"
     }

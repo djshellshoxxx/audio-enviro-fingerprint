@@ -11,17 +11,88 @@ from .spectrogram import compute_spectrogram, colorize, encode_png
 BG, PANEL, FG, MUTED, ACCENT, WARN = "#111827", "#1f2937", "#e5e7eb", "#9ca3af", "#67e8f9", "#fb7185"
 
 
+class ScrollableTab(ttk.Frame):
+    """Vertically scroll review controls without changing native table scrolling."""
+    def __init__(self, parent, padding=12):
+        super().__init__(parent)
+        self.scroll_canvas = tk.Canvas(self, background=BG, highlightthickness=0,
+                                       width=1, height=1, takefocus=True, yscrollincrement=24)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.scroll_canvas.yview)
+        self.scroll_canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.scroll_canvas.pack(side="left", fill="both", expand=True)
+        self.content = ttk.Frame(self.scroll_canvas, padding=padding)
+        self._window = self.scroll_canvas.create_window(0, 0, window=self.content, anchor="nw")
+        self._padding = padding
+        self._wired = set()
+        self.content.bind("<Configure>", self._content_changed)
+        self.scroll_canvas.bind("<Configure>", self._viewport_changed)
+        self.scroll_canvas.bind("<Button-1>", lambda _event: self.scroll_canvas.focus_set())
+        for sequence, action in (("<Prior>", lambda: self.scroll_canvas.yview_scroll(-1, "pages")),
+                                 ("<Next>", lambda: self.scroll_canvas.yview_scroll(1, "pages")),
+                                 ("<Home>", lambda: self.scroll_canvas.yview_moveto(0)),
+                                 ("<End>", lambda: self.scroll_canvas.yview_moveto(1))):
+            self.scroll_canvas.bind(sequence, lambda _event, callback=action: (callback(), "break")[1])
+        self.scroll_canvas.bind("<MouseWheel>", self._wheel)
+        self.scroll_canvas.bind("<Button-4>", lambda _event: self.scroll_canvas.yview_scroll(-1, "units"))
+        self.scroll_canvas.bind("<Button-5>", lambda _event: self.scroll_canvas.yview_scroll(1, "units"))
+
+    def _viewport_changed(self, event):
+        self.scroll_canvas.itemconfigure(self._window, width=event.width)
+        for widget in self.content.winfo_children():
+            if isinstance(widget, ttk.Label):
+                widget.configure(wraplength=max(120, event.width - 2 * self._padding))
+
+    def _content_changed(self, _event=None):
+        self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all"))
+        self._wire_focus(self.content)
+
+    def _wire_focus(self, parent):
+        for widget in (parent, *parent.winfo_children()):
+            if str(widget) not in self._wired:
+                self._wired.add(str(widget))
+                widget.bind("<FocusIn>", self._reveal_focus, add="+")
+                # Treeview/Text/Spinbox keep their own wheel and keyboard behavior.
+                if isinstance(widget, (ttk.Frame, ttk.Label)):
+                    widget.bind("<MouseWheel>", self._wheel, add="+")
+                    widget.bind("<Button-4>", lambda _e: self.scroll_canvas.yview_scroll(-1, "units"), add="+")
+                    widget.bind("<Button-5>", lambda _e: self.scroll_canvas.yview_scroll(1, "units"), add="+")
+            if widget is not parent:
+                self._wire_focus(widget)
+
+    def _reveal_focus(self, event):
+        top = event.widget.winfo_rooty() - self.content.winfo_rooty()
+        current = self.scroll_canvas.canvasy(0)
+        height = self.scroll_canvas.winfo_height()
+        total = max(1, self.content.winfo_height())
+        bottom = top + event.widget.winfo_height()
+        if top < current or event.widget.winfo_height() > height:
+            self.scroll_canvas.yview_moveto(top / total)
+        elif bottom > current + height:
+            self.scroll_canvas.yview_moveto((bottom - height) / total)
+
+    def _wheel(self, event):
+        if event.delta:
+            amount = -1 if event.delta > 0 else 1
+            self.scroll_canvas.yview_scroll(amount * max(1, abs(event.delta) // 120), "units")
+        return "break"
+
+
 def tree(parent, columns, height=8, **kw):
-    """Treeview with (id, heading, width) column triples and a vertical scrollbar."""
+    """Treeview with native vertical/horizontal scrolling and readable columns."""
     frame = ttk.Frame(parent)
     view = ttk.Treeview(frame, columns=[c[0] for c in columns], show="headings", height=height, **kw)
     for cid, title, width in columns:
         view.heading(cid, text=title)
-        view.column(cid, width=width, anchor="w")
+        view.column(cid, width=width, minwidth=width, anchor="w")
     bar = ttk.Scrollbar(frame, orient="vertical", command=view.yview)
-    view.configure(yscrollcommand=bar.set)
-    view.pack(side="left", fill="both", expand=True)
-    bar.pack(side="right", fill="y")
+    horizontal = ttk.Scrollbar(frame, orient="horizontal", command=view.xview)
+    view.configure(yscrollcommand=bar.set, xscrollcommand=horizontal.set)
+    view.grid(row=0, column=0, sticky="nsew")
+    bar.grid(row=0, column=1, sticky="ns")
+    horizontal.grid(row=1, column=0, sticky="ew")
+    frame.rowconfigure(0, weight=1)
+    frame.columnconfigure(0, weight=1)
     return frame, view
 
 
@@ -80,21 +151,21 @@ class SpectrogramTab(ttk.Frame):
                 self.on_marker(t)
 
 
-class MusicalTab(ttk.Frame):
+class MusicalTab(ScrollableTab):
     def __init__(self, parent):
         super().__init__(parent, padding=12)
-        ttk.Label(self, text="Heuristic musical description of channel 1. Confidence values are not probabilities.",
+        ttk.Label(self.content, text="Heuristic musical description of channel 1. Confidence values are not probabilities.",
                   style="Sub.TLabel").pack(anchor="w")
-        self.summary = ttk.Label(self, text="", font=("Segoe UI", 13, "bold"), foreground=ACCENT)
+        self.summary = ttk.Label(self.content, text="", font=("Segoe UI", 13, "bold"), foreground=ACCENT)
         self.summary.pack(anchor="w", pady=8)
-        heading(self, "Dominant stationary tones (room tone, hum, instruments)")
-        frame, self.tones = tree(self, [("note", "Note", 80), ("hz", "Frequency (Hz)", 130),
+        heading(self.content, "Dominant stationary tones (room tone, hum, instruments)")
+        frame, self.tones = tree(self.content, [("note", "Note", 80), ("hz", "Frequency (Hz)", 130),
                                         ("cents", "Cents", 90), ("lvl", "Level over median (dB)", 170)], 7)
         frame.pack(fill="x")
-        heading(self, "Key candidates (Krumhansl-Schmuckler correlation)")
-        frame, self.keys = tree(self, [("key", "Key", 150), ("r", "Correlation", 120)], 4)
+        heading(self.content, "Key candidates (Krumhansl-Schmuckler correlation)")
+        frame, self.keys = tree(self.content, [("key", "Key", 150), ("r", "Correlation", 120)], 4)
         frame.pack(fill="x")
-        self.hum = ttk.Label(self, text="", style="Sub.TLabel")
+        self.hum = ttk.Label(self.content, text="", style="Sub.TLabel")
         self.hum.pack(anchor="w", pady=8)
 
     def update_result(self, result):
@@ -125,16 +196,16 @@ class MusicalTab(ttk.Frame):
         self.hum.configure(text=hum_text + "  (tonal interference only; not ENF analysis)")
 
 
-class RecurrenceTab(ttk.Frame):
+class RecurrenceTab(ScrollableTab):
     def __init__(self, parent):
         super().__init__(parent, padding=12)
-        ttk.Label(self, text="Later segments whose measured features return to an earlier segment after a "
+        ttk.Label(self.content, text="Later segments whose measured features return to an earlier segment after a "
                   "departure. Review candidates; they do not identify a place.", style="Sub.TLabel").pack(anchor="w")
-        frame, self.view = tree(self, [("id", "ID", 50), ("earlier", "Earlier (s)", 130), ("later", "Returns (s)", 130),
+        frame, self.view = tree(self.content, [("id", "ID", 50), ("earlier", "Earlier (s)", 130), ("later", "Returns (s)", 130),
                                        ("dist", "Mean distance", 110), ("peak", "Departure peak", 110),
                                        ("why", "Largest feature differences", 520)], 12)
         frame.pack(fill="both", expand=True, pady=8)
-        self.note = ttk.Label(self, text="", style="Sub.TLabel", wraplength=1000)
+        self.note = ttk.Label(self.content, text="", style="Sub.TLabel", wraplength=1000)
         self.note.pack(anchor="w")
 
     def update_result(self, result):
@@ -149,18 +220,18 @@ class RecurrenceTab(ttk.Frame):
         self.note.configure(text="" if rows else "No recurrence found at the default thresholds.")
 
 
-class ChannelsTab(ttk.Frame):
+class ChannelsTab(ScrollableTab):
     def __init__(self, parent):
         super().__init__(parent, padding=12)
-        heading(self, "Per-channel levels")
-        frame, self.channels = tree(self, [("ch", "Channel", 80), ("rms", "RMS (dBFS)", 120), ("peak", "Peak (dBFS)", 120),
+        heading(self.content, "Per-channel levels")
+        frame, self.channels = tree(self.content, [("ch", "Channel", 80), ("rms", "RMS (dBFS)", 120), ("peak", "Peak (dBFS)", 120),
                                            ("fp", "Fingerprint SHA-256", 600)], 6)
         frame.pack(fill="x")
-        heading(self, "Channel 1 vs other channels")
-        frame, self.pairs = tree(self, [("pair", "Pair", 80), ("corr", "Correlation", 100), ("lag", "Lag (ms)", 90),
+        heading(self.content, "Channel 1 vs other channels")
+        frame, self.pairs = tree(self.content, [("pair", "Pair", 80), ("corr", "Correlation", 100), ("lag", "Lag (ms)", 90),
                                         ("ild", "Level diff (dB)", 120), ("side", "Side/Mid (dB)", 120)], 6)
         frame.pack(fill="x")
-        self.note = ttk.Label(self, text="", style="Sub.TLabel")
+        self.note = ttk.Label(self.content, text="", style="Sub.TLabel")
         self.note.pack(anchor="w", pady=8)
 
     def update_result(self, result):
@@ -177,7 +248,7 @@ class ChannelsTab(ttk.Frame):
         self.note.configure(text="Negative correlation indicates opposite polarity; lag is limited to ±1.5 ms.")
 
 
-class ReferenceTab(ttk.Frame):
+class ReferenceTab(ScrollableTab):
     """Guided known-location exemplar documentation with a quality review."""
     FIELDS = [("location_id", "Location identifier *"), ("recorded_utc", "Recorded (UTC) *"), ("operator", "Operator *"),
               ("recorder_make_model", "Recorder make/model *"), ("recorder_serial", "Recorder serial"),
@@ -190,9 +261,9 @@ class ReferenceTab(ttk.Frame):
 
     def __init__(self, parent, on_save):
         super().__init__(parent, padding=12)
-        ttk.Label(self, text="Document the exemplar for the loaded recording (* required). A location label alone "
+        ttk.Label(self.content, text="Document the exemplar for the loaded recording (* required). A location label alone "
                   "never establishes a match.", style="Sub.TLabel").pack(anchor="w")
-        form = ttk.Frame(self)
+        form = ttk.Frame(self.content)
         form.pack(fill="x", pady=6)
         self.entries = {}
         for n, (key, label) in enumerate(self.FIELDS):
@@ -213,11 +284,11 @@ class ReferenceTab(ttk.Frame):
         pair.grid(row=row, column=1, sticky="w")
         self.repeat.pack(in_=pair, side="left")
         self.planned.pack(in_=pair, side="left", padx=6)
-        buttons = ttk.Frame(self)
+        buttons = ttk.Frame(self.content)
         buttons.pack(anchor="w", pady=6)
         ttk.Button(buttons, text="Review quality", command=self.review).pack(side="left")
         ttk.Button(buttons, text="Save reference record", command=lambda: on_save(self)).pack(side="left", padx=8)
-        frame, self.checks = tree(self, [("check", "Check", 160), ("status", "Status", 80), ("detail", "Detail", 700)], 8)
+        frame, self.checks = tree(self.content, [("check", "Check", 160), ("status", "Status", 80), ("detail", "Detail", 700)], 8)
         frame.pack(fill="both", expand=True)
         self.provider = lambda: None
         self.last_review = None

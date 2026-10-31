@@ -44,7 +44,7 @@ These reviews and tests establish software behavior only. They do not establish 
 
 ## Verification and consolidated revision
 
-Frozen-source checks: **128 tests PASS, no skips**, including three actual Tk workflows and real FFmpeg FLAC/MP3 tests. Source GUI smoke PASS. Compileall, deterministic quick synthetic benchmark, wheel build, Linux PyInstaller build and packaged GUI smoke PASS; packaged version is 0.3.0b2. Packaged smoke ran without the builder LD_LIBRARY_PATH override. Independent follow-up checks confirm both final-review preservation defects resolved (14 helper/store tests PASS). No release tag or public binary publication performed.
+Frozen-source checks: **129 tests PASS, no skips**, including four actual Tk workflows and real FFmpeg FLAC/MP3 tests. Source GUI smoke PASS. Compileall, deterministic quick synthetic benchmark, wheel build, Linux PyInstaller build and packaged GUI smoke PASS; packaged version is 0.3.0b2. Packaged smoke ran without the builder LD_LIBRARY_PATH override. Independent follow-up checks confirm both final-review preservation defects resolved (14 helper/store tests PASS). No release tag or public binary publication performed.
 
 Verification commands:
 
@@ -66,3 +66,5 @@ Build/benchmark logs and binaries are retained under `/workspace/work/audio-envi
 - Representative controlled/field recordings, calibrated thresholds, cross-device robustness, measured-IR reference validation and accessibility review remain required before broader claims.
 - Windows/macOS native bundle validation, signing and notarization require their target runners/credentials. A local Linux build is not evidence those platforms passed.
 - Legacy branches' alternative scientific methods, stored reference ranking, selected-channel decoder API and chained reference schema were deliberately superseded/deferred with reasons. Historical commits remain preserved in the consolidated graph; no old scientific variant is silently presented as the current method.
+
+Visual follow-up: all review controls remain reachable at the advertised 900x600 minimum through tab scrolling, keyboard paging and focus reveal. Tables retain native scrolling and have horizontal scrollbars. Independent reviewer confirmed the reachability regression and preferences helpers; final full suite includes the expanded minimum-window journey.

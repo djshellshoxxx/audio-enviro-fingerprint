@@ -62,3 +62,9 @@ The three divergent implementation branches are alternative implementations from
 Graph consolidation is performed by the lead after integration, retaining reviewed superseded branch tips as ancestry without replacing current production files. Final ancestry checks and integrated verification belong in the main work-session/audit record.
 
 Final review also reproduced SQLite `INSERT OR REPLACE` deleting a conflicting logical-key row when no explicit ID was supplied. The CaseStore connection now enables recursive triggers so those implicit deletions fire existing append-only guards. The new evidence/marker logical-key regression first failed and now passes, while repeated registration remains idempotent. These are application-connection safeguards; another database owner can disable PRAGMAs or drop triggers, so no tamper-resistance guarantee is implied.
+
+## Integrated graph verification
+
+All ten remote heads were fetched through normal Git after granting the shell its network access; the custom fetch-equivalent helper was stopped. Compatible ports were committed in `74a1e52`. Five explicit reconciliation merges (`6697170`, `ff0810a`, `bd326a0`, `9b6e7ff`, `da58adc`) preserve the divergent histories while retaining the deliberately reviewed current tree. These use the `ours` merge strategy only after the compatible ports and supersession decisions above; they do not claim every conflicting legacy behavior was implemented.
+
+`git merge-base --is-ancestor <each origin ref> HEAD` passed for all ten fetched heads. The Git tree before and after the five reconciliation merges was identical. No remote branch was deleted or force-updated. Follow-up delivery fixes and records remain descendants of this consolidated graph.

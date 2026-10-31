@@ -40,14 +40,14 @@ Five usability features chosen by lead: (1) persisted recent recording menu with
 | AEF-103 | ui_audit: app, ui_tabs, preferences/timecode helper + GUI regressions; AUDIT_UI.md | AEF-101/102 contracts preserved | DONE: audit then fix GUI workflow failures and implement usability features 1–4 |
 | AEF-104 | branch_reconcile: BRANCH_RECONCILIATION.md; proposed ports only until ownership transfer | remote branch enumeration | DONE: inventory every tip, ancestor/unique changes, preserve useful additions without legacy regressions |
 | AEF-105 | lead: html_report.py, cli.py, HTML tests, documentation/tasks and integration git state | report.build_report/write_export, UI adapter uses write_html_report | DONE: static HTML via CLI and GUI, evidence recheck and safe atomic export |
-| AEF-106 | lead and independent final reviewer: suite, real GUI smoke, benchmark, package, full diff | all above | INTEGRATING: fix all material findings, consolidated commit and honest limitations |
+| AEF-106 | lead and independent final reviewer: suite, real GUI smoke, benchmark, package, full diff | all above | DONE: fix all material findings, consolidated commit and honest limitations |
 
 ### Execution steps for each implementation
 
 - [x] Read owned source/spec and audit; write failing real-behavior regression and observe expected failure.
 - [x] Implement smallest correction/addition; run focused tests.
 - [x] Peer review boundary changes; lead runs integrated tests, synthetic benchmark, compile/package and GUI smoke.
-- [ ] Update audit finding disposition and specification traceability; create local consolidated commit only after review.
+- [x] Update audit finding disposition and specification traceability; create local consolidated commit only after review.
 
 ## Feature interfaces
 
@@ -58,3 +58,5 @@ GUI owns preferences helper API internally. All background jobs publish queue ev
 ## Resource and delivery state
 
 Baseline HEAD 4343f34; previous session's tested diff remains preserved. One Linux environment, bounded workers with exclusive files, no paid resources added. Shell Git fetch is currently blocked by unavailable proxy; GitHub read connector works. Native Windows/macOS builds and field-data calibration must be reported separately from local software completion.
+
+Post-freeze visual review at the advertised 900x600 minimum found clipped lower tab content. The scoped shared scroll-container correction is implemented across non-spectrogram tabs with keyboard/focus handling and native table horizontal scrolling. Actual Tk reachability regression passes at 900x600; final frozen-source suite is 129 PASS with no skips.

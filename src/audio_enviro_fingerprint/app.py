@@ -20,7 +20,7 @@ from .report import write_report
 from .preferences import load_recent, remember_recent
 from .timecode import parse_timecode
 from .ui_tabs import (BG, FG, MUTED, ACCENT, ChannelsTab, MusicalTab, RecurrenceTab, ReferenceTab,
-                      SpectrogramTab, fill, heading, tree)
+                      SpectrogramTab, ScrollableTab, fill, heading, tree)
 
 
 def compare_recording(first, path, *, cancel_event=None, progress=None):
@@ -120,10 +120,16 @@ class FingerprinterApp(tk.Tk):
             self.notebook.add(tab, text=title)
         ttk.Label(outer, text="Screening aid only. Similarity does not identify a physical location or establish authenticity.",
                   style="Sub.TLabel").pack(anchor="w", pady=(6, 0))
+        outer.bind("<Configure>", self._wrap_evidence_labels)
+
+    def _wrap_evidence_labels(self, event):
+        for label in (self.file_label, self.hash_label):
+            label.configure(wraplength=max(120, event.width - 28))
 
     def _analysis_tab(self):
-        tab = ttk.Frame(self.notebook, padding=12)
-        self.notebook.add(tab, text="Analysis")
+        scroll = ScrollableTab(self.notebook)
+        self.notebook.add(scroll, text="Analysis")
+        tab = scroll.content
         heading(tab, "Transition candidates")
         self.timeline = tk.Canvas(tab, height=90, background="#0b1220", highlightthickness=0)
         self.timeline.pack(fill="x", pady=(0, 8))
@@ -138,7 +144,8 @@ class FingerprinterApp(tk.Tk):
         frame.pack(fill="both", expand=True)
 
     def _notes_tab(self):
-        tab = self.notes_tab = ttk.Frame(self.notebook, padding=12)
+        self.notes_tab = ScrollableTab(self.notebook)
+        tab = self.notes_tab.content
         ttk.Label(tab, text="Notes and markers are saved with the evidence SHA-256. Marker edits keep revision history.",
                   style="Sub.TLabel").pack(anchor="w", pady=(0, 6))
         form = ttk.Frame(tab)

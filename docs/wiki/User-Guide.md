@@ -56,3 +56,5 @@ CLI exit codes are 0 for success, 1 for input/IO failure and 2 for verification 
 ## Scope and interpretation
 
 Candidate transitions and recurrences are places to review. The software does not identify a physical place, estimate the probability of a common place, detect all edits or authenticate recordings. The RT60 helper is experimental and only suitable for a separate measured impulse response; it is not ISO 3382 conformance. Synthetic benchmark success establishes software behavior, not forensic error rates. Representative field recordings and independent validation remain necessary.
+
+At smaller window sizes, use each review tab’s vertical scrollbar or focus its canvas and use Page Up/Page Down/Home/End. Keyboard focus reveals off-screen controls; wide tables have their own horizontal scrollbars.
