@@ -68,3 +68,7 @@ Build/benchmark logs and binaries are retained under `/workspace/work/audio-envi
 - Legacy branches' alternative scientific methods, stored reference ranking, selected-channel decoder API and chained reference schema were deliberately superseded/deferred with reasons. Historical commits remain preserved in the consolidated graph; no old scientific variant is silently presented as the current method.
 
 Visual follow-up: all review controls remain reachable at the advertised 900x600 minimum through tab scrolling, keyboard paging and focus reveal. Tables retain native scrolling and have horizontal scrollbars. Independent reviewer confirmed the reachability regression and preferences helpers; final full suite includes the expanded minimum-window journey.
+
+## Native CI follow-up
+
+The initial macOS ARM CI run found three test assertions comparing canonical returned paths with unresolved temporary paths (`/var` versus `/private/var`). Reproduced all three failures on Linux using a symlink-backed temporary root; corrected expected paths to the same canonical contract used by the application. Also corrected the equivalent real-Tk recent-history assertion. No application behavior or acceptance range changed. The complete 129-test suite passes under the symlink-backed root (four GUI tests skipped without a display). Native matrix rerun is required for the corrected test revision before merge.

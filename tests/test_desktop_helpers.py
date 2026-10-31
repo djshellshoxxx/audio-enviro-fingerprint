@@ -44,7 +44,7 @@ class DesktopHelperTests(unittest.TestCase):
             self.assertTrue(load_recent(p)[0].endswith('/14'))
             parent=Path(tmp)/'file'; parent.write_bytes(b'x')
             self.assertEqual(remember_recent(parent/'settings.json',Path(tmp)/'audio.wav'),
-                             [str(Path(tmp)/'audio.wav')])
+                             [str((Path(tmp)/'audio.wav').resolve())])
             self.assertEqual(parent.read_bytes(),b'x')
 
     def test_recent_preferences_never_overwrite_selected_evidence_or_alias(self):
@@ -94,7 +94,7 @@ class DesktopHelperTests(unittest.TestCase):
             original=b'{"another_application": true, "recent": []}'
             settings.write_bytes(original)
             recent=remember_recent(settings,Path(tmp)/'audio.wav')
-            self.assertEqual(recent,[str(Path(tmp)/'audio.wav')])
+            self.assertEqual(recent,[str((Path(tmp)/'audio.wav').resolve())])
             self.assertEqual(settings.read_bytes(),original)
             self.assertEqual(load_recent(settings),[])
 

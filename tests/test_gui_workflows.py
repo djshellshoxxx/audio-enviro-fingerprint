@@ -89,7 +89,7 @@ class GuiWorkflowTests(unittest.TestCase):
             write_wav(source, tone(440,4))
             write_wav(other, np.concatenate([tone(1500,8),tone(440,4),tone(1500,8),tone(440,4)]))
             path, found = search_recording(analyze_file(source,musical=False), other)
-            self.assertEqual(path,other)
+            self.assertEqual(path,other.resolve())
             self.assertEqual([(r.later_start_s,r.later_end_s) for r in found],[(8.0,12.0),(20.0,24.0)])
             self.assertTrue(all(r.earlier_start_s == 0.0 and r.earlier_end_s <= 4.0 for r in found))
 
@@ -133,7 +133,7 @@ class DesktopIntegrationTests(unittest.TestCase):
         self.finish_jobs()
         first = self.app.result
         self.assertIsNotNone(first['musical'])
-        self.assertEqual(self.app.recent_paths,[str(self.source)])
+        self.assertEqual(self.app.recent_paths,[str(self.source.resolve())])
         self.app.quick_analysis.set(True)
         self.app._open_recent(str(self.source))
         self.finish_jobs()
