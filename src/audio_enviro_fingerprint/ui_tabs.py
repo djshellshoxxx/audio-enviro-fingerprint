@@ -100,17 +100,19 @@ class MusicalTab(ttk.Frame):
     def update_result(self, result):
         m = result["musical"]
         if not m:
-            self.summary.configure(text="Musical analysis was skipped")
-            return
-        key, tempo, pitch = m["key"], m["tempo"], m["median_pitch"]
-        parts = [f"Key: {key['key']} {key['mode']} (r={key['correlation']:.2f})" if key["key"] else "Key: indeterminate",
-                 f"Tempo: {tempo['bpm']:.0f} BPM (conf {tempo['confidence']:.2f})" if tempo["bpm"] else "Tempo: none detected",
-                 f"Pitch: {pitch['note']} ({pitch['cents']:+.0f}¢)" if pitch else "Pitch: none detected"]
-        self.summary.configure(text="   ·   ".join(parts))
-        fill(self.tones, [(t["note"], f"{t['frequency_hz']:.2f}", f"{t['cents']:+.1f}",
-                           f"{t['level_db_above_median']:.1f}") for t in m["dominant_tones"]])
-        alts = [{"key": key["key"], "mode": key["mode"], "correlation": key["correlation"]}] + key["alternatives"] if key["key"] else []
-        fill(self.keys, [(f"{a['key']} {a['mode']}", f"{a['correlation']:.3f}") for a in alts])
+            self.summary.configure(text="Musical analysis was skipped (quick analysis)")
+            fill(self.tones, [])
+            fill(self.keys, [])
+        else:
+            key, tempo, pitch = m["key"], m["tempo"], m["median_pitch"]
+            parts = [f"Key: {key['key']} {key['mode']} (r={key['correlation']:.2f})" if key["key"] else "Key: indeterminate",
+                     f"Tempo: {tempo['bpm']:.0f} BPM (conf {tempo['confidence']:.2f})" if tempo["bpm"] else "Tempo: none detected",
+                     f"Pitch: {pitch['note']} ({pitch['cents']:+.0f}¢)" if pitch else "Pitch: none detected"]
+            self.summary.configure(text="   ·   ".join(parts))
+            fill(self.tones, [(t["note"], f"{t['frequency_hz']:.2f}", f"{t['cents']:+.1f}",
+                               f"{t['level_db_above_median']:.1f}") for t in m["dominant_tones"]])
+            alts = [{"key": key["key"], "mode": key["mode"], "correlation": key["correlation"]}] + key["alternatives"] if key["key"] else []
+            fill(self.keys, [(f"{a['key']} {a['mode']}", f"{a['correlation']:.3f}") for a in alts])
         hum = result["hum"]
         if hum.get("reason"):
             hum_text = f"Mains hum: unavailable — {hum['reason']}"
@@ -170,7 +172,7 @@ class ChannelsTab(ttk.Frame):
             return
         fill(self.channels, [(c["channel"], f"{c['rms_dbfs']:.1f}", f"{c['peak_dbfs']:.1f}",
                               c["fingerprint_sha256"] or "—") for c in data["channels"]])
-        fill(self.pairs, [("1–%d" % p["channels"][1], f"{p['correlation_zero_lag']:+.3f}", f"{p['peak_lag_ms']:+.3f}",
+        fill(self.pairs, [("1–%d" % p["channels"][1], f"{p['correlation_zero_lag']:+.3f}", f"{p['peak_lag_ms']:+.3f}" if p["peak_lag_ms"] is not None else "Unavailable",
                            f"{p['level_difference_db']:+.2f}", f"{p['side_to_mid_db']:+.1f}") for p in data["pairs"]])
         self.note.configure(text="Negative correlation indicates opposite polarity; lag is limited to ±1.5 ms.")
 
@@ -219,6 +221,15 @@ class ReferenceTab(ttk.Frame):
         frame.pack(fill="both", expand=True)
         self.provider = lambda: None
         self.last_review = None
+
+    def reset_for_recording(self):
+        """A previous exemplar's metadata and review never label new evidence."""
+        for entry in self.entries.values():
+            entry.delete(0, "end")
+        self.repeat.set("1")
+        self.planned.set("3")
+        self.last_review = None
+        fill(self.checks, [])
 
     def metadata(self) -> ReferenceMetadata:
         values = {k: e.get().strip() for k, e in self.entries.items()}

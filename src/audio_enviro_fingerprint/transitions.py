@@ -37,7 +37,7 @@ def detect_transitions(analysis, threshold: float = 0.35,
             delta = float(after.band_power_db[name] - before.band_power_db[name])
             band_deltas[name] = delta
             evidence[f"band_power_db.{name}"] = delta
-        # Median normalized changes keep one narrow-band feature from dominating.
+        # Mean normalized changes aggregate the supporting feature differences.
         parts = [abs(evidence["rms_dbfs"]) / scales["rms_dbfs"],
                  abs(evidence["spectral_centroid_hz"]) / scales["spectral_centroid_hz"],
                  abs(evidence["spectral_flatness"]) / scales["spectral_flatness"]]

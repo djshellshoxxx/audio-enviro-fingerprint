@@ -3,78 +3,114 @@
   "tasks": [
     {
       "id": "beta-core",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Forensic-safe input, integrity, acoustic descriptors, transitions, comparisons, notes, export"
     },
     {
       "id": "beta-tests",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Cross-platform unit, package, and GUI smoke QA"
     },
     {
       "id": "environment-recurrence",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Detect recurring environment segments within and across recordings"
     },
     {
       "id": "comparison-explainability",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Expand transparent feature-level explanations for all validated methods"
     },
     {
       "id": "reference-acquisition",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Guided, documented known-location exemplar acquisition"
     },
     {
       "id": "scientific-benchmark",
-      "status": "planned",
+      "status": "READY",
       "title": "Build representative benchmark and validation protocol before calibration"
     },
     {
       "id": "multi-channel",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Analyze channels independently and add stereo/spatial review"
     },
     {
       "id": "codec-support",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Optional FFmpeg decoding with provenance, resource limits and FLAC/MP3 integration coverage"
     },
     {
       "id": "musical-analysis",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Key, tempo, pitch, dominant tones, mains hum"
     },
     {
       "id": "cli-reports",
-      "status": "implemented",
+      "status": "DONE",
       "title": "CLI, spectrogram, manifest-verified reports, manual markers"
     },
     {
       "id": "streaming-analysis",
-      "status": "planned",
+      "status": "READY",
       "title": "Full streaming decode and large-recording field performance verification"
     },
     {
       "id": "cooperative-cancellation",
-      "status": "implemented",
+      "status": "DONE",
       "title": "GUI cancellation with hashing/frame/recurrence checkpoints and no partial-result publication"
     },
     {
       "id": "catalog-clustering",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Deterministic descriptor grouping with all pair explanations; no physical attribution"
     },
     {
       "id": "synthetic-benchmark",
-      "status": "implemented",
+      "status": "DONE",
       "title": "Ported deterministic synthetic comparison, transition, recurrence and confounder scenarios"
     },
     {
       "id": "branch-reconciliation",
-      "status": "in_progress",
-      "title": "Port remaining compatible older modules and resolve incompatible segmentation/store/GUI alternatives"
+      "status": "INTEGRATING",
+      "title": "Adapt compatible branch work and preserve superseded alternatives in consolidated history",
+      "record": "docs/BRANCH_RECONCILIATION.md"
+    },
+    {
+      "id": "application-audit",
+      "title": "Full application audit with resolved software-contract findings",
+      "status": "DONE",
+      "owner": "lead",
+      "scope": "Current beta application; excludes field calibration and signed multi-platform release",
+      "owned_files": [
+        "docs/DELIVERY_AUDIT.md"
+      ],
+      "dependencies": [
+        "beta-core"
+      ],
+      "contracts": "docs/SPECIFICATIONS_V2.md",
+      "acceptance": "128 tests pass without skips; source and packaged Linux GUI smoke pass",
+      "workspace": "codex/spec-audit-usability",
+      "handoff": "docs/DELIVERY_AUDIT.md"
+    },
+    {
+      "id": "five-usability-features",
+      "title": "Recent files, quick mode, timecodes, marker editor, HTML reports",
+      "status": "DONE",
+      "owner": "lead",
+      "scope": "Current beta application; excludes field calibration and signed multi-platform release",
+      "owned_files": [
+        "src/audio_enviro_fingerprint/app.py",
+        "src/audio_enviro_fingerprint/html_report.py"
+      ],
+      "dependencies": [
+        "beta-core"
+      ],
+      "contracts": "docs/SPECIFICATIONS_V2.md",
+      "acceptance": "128 tests pass without skips; source and packaged Linux GUI smoke pass",
+      "workspace": "codex/spec-audit-usability",
+      "handoff": "docs/DELIVERY_AUDIT.md"
     }
   ]
 }

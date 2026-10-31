@@ -8,6 +8,7 @@ per-feature differences are retained for every reported match.
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+from bisect import bisect_right
 import math
 
 import numpy as np
@@ -71,7 +72,7 @@ def find_recurrences(analysis, other=None, threshold: float = 0.25, departure: f
     if not analysis.frames:
         return []
     va, names = frame_vectors(analysis)
-    hop = analysis.hop_seconds
+    timestamps = [frame.start_seconds for frame in analysis.frames]
     cross = other is not None
     if cross:
         if not other.frames:
@@ -81,26 +82,29 @@ def find_recurrences(analysis, other=None, threshold: float = 0.25, departure: f
             raise ValueError("Recordings use different band layouts; cannot compare")
     else:
         vb = va
-    gap = max(1, math.ceil(min_gap_seconds / hop))
     matches = []                              # (j in analysis, i in reference, distance, depart)
+    departure_peaks = np.zeros(len(va)) if not cross else None
     for j in range(len(va)):
         check_cancelled(should_cancel)
-        limit = len(vb) if cross else j - gap + 1
-        if limit <= 0:
-            continue
-        # Retain only one query column; an all-pairs tensor grows quadratically
-        # with recording length and can exhaust RAM before analysis completes.
-        col = _distances(vb[:limit], va[j:j + 1])[:, 0]
-        i = int(np.argmin(col))
-        if col[i] > threshold:
-            continue
-        peak = None
+        # Subtracting decimal timestamps can place an exact gap boundary a
+        # few float rounding steps below its reference timestamp.
+        tolerance = 2 * math.ulp(max(abs(timestamps[j]), min_gap_seconds))
+        limit = (len(vb) if cross else bisect_right(
+            timestamps, timestamps[j] - min_gap_seconds + tolerance, hi=j))
+        # One query column and one running departure maximum per earlier
+        # reference retain linear working memory and quadratic total work.
+        col = _distances(vb if cross else vb[:j], va[j:j + 1])[:, 0]
+        eligible = np.flatnonzero(col[:limit] <= threshold)
         if not cross:
-            between = _distances(vb[i:i + 1], va[i + 1:j])[0]
-            peak = float(between.max()) if between.size else 0.0
-            if peak < departure:
-                continue
-        matches.append((j, i, float(col[i]), peak))
+            eligible = eligible[departure_peaks[eligible] >= departure]
+        if eligible.size:
+            i = int(eligible[np.argmin(col[eligible])])
+            peak = None if cross else float(departure_peaks[i])
+            matches.append((j, i, float(col[i]), peak))
+        if not cross:
+            # Update after matching, so the current frame cannot count as its
+            # own intervening departure; only i < k < j may qualify.
+            np.maximum(departure_peaks[:j], col, out=departure_peaks[:j])
     results = []
     run = []
     for m in matches + [None]:
@@ -119,11 +123,15 @@ def _summarize(run, va, vb, names, analysis, other, number) -> Recurrence:
     dists = [m[2] for m in run]
     deltas = np.mean([va[j] - vb[i] for j, i, *_ in run], axis=0)
     peaks = [m[3] for m in run if m[3] is not None]
-    span = analysis.frame_seconds
-    ref_hop = (other or analysis).hop_seconds
-    ref_span = (other or analysis).frame_seconds
-    later = (js[0] * analysis.hop_seconds, js[-1] * analysis.hop_seconds + span)
-    earlier = (min(refs) * ref_hop, max(refs) * ref_hop + ref_span)
+    reference = other if other is not None else analysis
+    # Feature extraction quantizes window sizes to complete samples. Stored
+    # timestamps and the same quantization keep report ranges on the audio clock.
+    span = max(2, round(analysis.frame_seconds * analysis.sample_rate)) / analysis.sample_rate
+    ref_span = max(2, round(reference.frame_seconds * reference.sample_rate)) / reference.sample_rate
+    later = (analysis.frames[js[0]].start_seconds,
+             min(analysis.duration_seconds, analysis.frames[js[-1]].start_seconds + span))
+    earlier = (reference.frames[min(refs)].start_seconds,
+               min(reference.duration_seconds, reference.frames[max(refs)].start_seconds + ref_span))
     peak = max(peaks) if peaks else None
     text = (f"Frames {len(run)} matched with mean distance {np.mean(dists):.3f}"
             + (f" after departure peak {peak:.2f}" if peak is not None else " (cross-recording)")

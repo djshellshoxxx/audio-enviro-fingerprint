@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0b2 — audited development build
+
+### Added
+- Recent recordings, quick analysis, clock-time annotation/navigation, and precise marker editing with revision history.
+- Printable static HTML reports through the GUI and `analyze --format html`, with escaped annotations and evidence-safe atomic exports.
+- Append-only SQL guards, evidence-bound saved recurrence runs in report history, and consolidated user/developer wiki.
+
+### Corrected after full application audit
+- Reject nonregular evidence before hashing and invalid hash chunk sizes; support RF64 ancillary size-table entries.
+- Enforce tempo/pitch bounds, disclose unavailable lag for silent/DC-only channels, and validate direct analysis metadata before hashing.
+- Select recurrence references satisfying departure as well as distance/gap, preserving continuing returns.
+- Run compare/search off the UI thread, search the selected recording in the correct direction, handle changed/deleted evidence, and clear stale musical/reference displays.
+- Preserve evidence used as a preferences path across later opens; prevent logical-key SQL replacement from bypassing append-only guards.
+
+### Previous maintenance fixes
+
+### Fixed
+- Enforce the decoded float64 byte limit for native WAV/RF64 before reading sample payloads; skip ancillary chunks with bounded metadata reads.
+- Accept complete compressed audio exactly at the configured decoded-size limit.
+- Use actual frame timestamps and sample-aligned window spans for recurrence ranges and minimum-gap eligibility.
+
 ## 0.3.0b1 — release candidate
 
 ### Added
