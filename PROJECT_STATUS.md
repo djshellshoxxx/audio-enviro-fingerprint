@@ -58,3 +58,11 @@ supported fingerprint schema versions. Full report JSON invariants cover stereo
 silence and tones across 8–192 kHz. Hum analysis no longer emits infinite values
 for silence or crashes on empty high-rate harmonic bins, and discloses actual
 frequency resolution and unavailable short-recording results.
+
+## Maintenance session — 2026-10-30
+
+Native WAV loading now checks the decoded float64 sample limit before reading the payload, using bounded metadata reads and seeking past ancillary chunks. This is a decoded-storage bound, not full streaming analysis or a peak-memory guarantee. Compressed inputs accept complete decodes exactly at the configured limit. Recurrence ranges use actual timestamps and sample-aligned frame spans rather than requested hop durations. See [session coordination and verification](docs/WORK_SESSION.md). This local maintenance increment has not been published or verified as native release bundles.
+
+## Specification audit and usability — 2026-10-30
+
+The 0.3.0b2 development increment audits all application modules against the current beta contracts, repairs identified software defects, adapts compatible branch work into the current schemas, and adds five usability features. See [delivery acceptance and limitations](docs/DELIVERY_AUDIT.md), [branch-by-branch dispositions](docs/BRANCH_RECONCILIATION.md), and the [user guide](docs/wiki/User-Guide.md). Historical statements above describe earlier checkpoints; they are not the current verification record. Representative field calibration and full streaming remain outstanding, and software contract completion does not establish forensic suitability.

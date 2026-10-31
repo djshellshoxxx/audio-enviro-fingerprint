@@ -30,11 +30,12 @@ def channel_pair_metrics(a: np.ndarray, b: np.ndarray, sample_rate: int, max_lag
     xc = np.fft.irfft(np.fft.rfft(a, size) * np.conj(np.fft.rfft(b, size)), size)
     lags = np.arange(-max_lag, max_lag + 1)
     values = xc[lags % size]
-    best = int(lags[np.argmax(np.abs(values))])
+    best = int(lags[np.argmax(np.abs(values))]) if denom > 0 else None
     peak = float(values[np.argmax(np.abs(values))] / denom) if denom > 0 else 0.0
     mid, side = (a + b) / 2, (a - b) / 2
     return {"correlation_zero_lag": corr0, "level_difference_db": _rms_db(a) - _rms_db(b),
-            "peak_lag_samples": best, "peak_lag_ms": 1000.0 * best / sample_rate,
+            "peak_lag_samples": best, "peak_lag_ms": 1000.0 * best / sample_rate if best is not None else None,
+            "lag_available": best is not None,
             "peak_correlation": peak, "side_to_mid_db": _rms_db(side) - _rms_db(mid)}
 
 

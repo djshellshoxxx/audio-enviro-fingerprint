@@ -40,17 +40,23 @@ def finite_number(value, label: str) -> float:
 
 def validate_frames(analysis) -> None:
     """Reject malformed direct AnalysisResult inputs before producing findings."""
+    sample_rate = positive_rate(analysis.sample_rate)
     for name in ("frame_seconds", "hop_seconds"):
         if finite_number(getattr(analysis, name), name) <= 0:
             raise ValueError("Analysis frame and hop durations must be positive")
     if finite_number(analysis.duration_seconds, "duration_seconds") < 0:
         raise ValueError("Analysis duration cannot be negative")
+    span = max(2, round(float(analysis.frame_seconds) * sample_rate)) / sample_rate
+    duration = float(analysis.duration_seconds)
+    tolerance = 2 * math.ulp(max(duration, span))
     previous = -1.0
     bands = None
     for frame in analysis.frames:
         start = finite_number(frame.start_seconds, "frame timestamp")
         if start < 0 or start < previous:
             raise ValueError("Frame timestamps must be nonnegative and ordered")
+        if start + span > duration + tolerance:
+            raise ValueError("Analysis frames must fall within the recording duration")
         previous = start
         for name in ("rms_dbfs", "spectral_centroid_hz", "spectral_flatness"):
             finite_number(getattr(frame, name), name)

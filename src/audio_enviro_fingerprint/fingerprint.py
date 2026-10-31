@@ -18,6 +18,7 @@ import json
 import numpy as np
 
 from .features import AnalysisResult
+from .validation import finite_number, validate_frames
 
 VERSION = "aefp-2"
 DECIMAL_PLACES = 6  # 1e-6 dB / Hz / flatness units: far below physical resolution
@@ -43,6 +44,13 @@ class Fingerprint:
 def make_fingerprint(analysis: AnalysisResult) -> Fingerprint:
     if not analysis.frames:
         raise ValueError("At least one complete analysis frame is required")
+    validate_frames(analysis)
+    for frame in analysis.frames:
+        if frame.spectral_centroid_hz < 0 or not 0 <= frame.spectral_flatness <= 1 + 1e-12:
+            raise ValueError("Fingerprint spectral descriptors are out of range")
+    if not isinstance(analysis.noise, dict) or "frame_rms_dbfs_p10" not in analysis.noise:
+        raise ValueError("Analysis requires a frame RMS percentile summary")
+    finite_number(analysis.noise["frame_rms_dbfs_p10"], "frame RMS percentile")
     frames = analysis.frames
     features = {
         "sample_rate_hz": int(analysis.sample_rate),

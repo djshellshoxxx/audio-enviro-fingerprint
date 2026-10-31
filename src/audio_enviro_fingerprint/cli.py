@@ -18,10 +18,12 @@ def _build_parser() -> argparse.ArgumentParser:
                                      description="Explainable acoustic environment screening.")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command", required=True)
-    a = sub.add_parser("analyze", help="analyze an audio recording and write a verifiable JSON report")
+    a = sub.add_parser("analyze", help="analyze audio and write a JSON or printable HTML report")
     a.add_argument("wav")
     a.add_argument("-o", "--output", help="report path (default: stdout)")
     a.add_argument("--no-musical", action="store_true", help="skip key/tempo/pitch analysis")
+    a.add_argument("--format", choices=("json", "html"), default="json",
+                   help="report format (default: json; HTML is a readable view)")
     c = sub.add_parser("compare", help="explainable comparison of two audio recordings")
     c.add_argument("first")
     c.add_argument("second")
@@ -48,8 +50,15 @@ def run(argv: list[str]) -> int:
         if args.command == "analyze":
             report = full_report(analyze_file(args.wav, musical=not args.no_musical))
             if args.output:
-                write_report(args.output, report)
+                if args.format == "html":
+                    from .html_report import write_html_report
+                    write_html_report(args.output, report)
+                else:
+                    write_report(args.output, report)
                 print(f"Report written to {args.output} (body sha256 {report['manifest']['body_sha256']})")
+            elif args.format == "html":
+                from .html_report import render_html_report
+                print(render_html_report(report))
             else:
                 print(json.dumps(report, indent=2, sort_keys=True, allow_nan=False))
         elif args.command == "compare":

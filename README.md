@@ -2,9 +2,19 @@
 
 Cross-platform desktop beta for reproducible, explainable acoustic-environment screening. It computes a cryptographic hash of the original file separately from a versioned acoustic feature fingerprint.
 
+## Usability additions in 0.3.0b2
+
+- Reopen successfully analyzed files from **Recent recordings**.
+- Use **Quick analysis** to skip musical descriptors while retaining acoustic screening.
+- Enter annotation times as seconds, `MM:SS`, or `HH:MM:SS`; select a transition or click the timeline to set the time.
+- Select a marker, change its time/title, and use **Save selected marker edit**; every revision stays in the case history.
+- Export readable, printable HTML alongside verifiable JSON. In the desktop report dialog, use a `.html` filename; CLI example: `audio-enviro-fingerprint analyze recording.wav --no-musical --format html -o report.html`. HTML is a readable view; retain JSON for the `verify` command.
+
+The [user guide](docs/wiki/User-Guide.md), [full audit and acceptance record](docs/DELIVERY_AUDIT.md), and [branch reconciliation record](docs/BRANCH_RECONCILIATION.md) describe this development increment.
+
 ## Current development additions
 
-The v0.2 development line includes recurrence, guided reference records, per-channel/spatial metrics, musical/hum descriptors, spectrogram export, marker history, CLI, and manifest verification. The completion audit adds optional compressed input via local FFmpeg, decoder provenance, cooperative cancellation, linear-memory recurrence search, and evidence-safe atomic exports. See [current specifications](docs/SPECIFICATIONS_V2.md) and [build/dependency instructions](docs/BUILDING.md). Representative scientific validation and full streaming analysis remain outstanding.
+The v0.2 development line includes recurrence, guided reference records, per-channel/spatial metrics, musical/hum descriptors, spectrogram export, marker history, CLI, and manifest verification. The completion audit adds optional compressed input via local FFmpeg, decoder provenance, cooperative cancellation, linear-memory recurrence search, and evidence-safe atomic exports. See [current specifications](docs/SPECIFICATIONS_V2.md) and [build/dependency instructions](docs/BUILDING.md). Native WAV imports enforce the same 512 MiB decoded float64 sample limit as compressed inputs, checking the declared payload before reading it and skipping ancillary chunks. This bounds decoded sample storage across all channels, not peak process memory. Recurrence intervals and minimum gaps follow actual frame timestamps. Representative scientific validation and full streaming analysis remain outstanding.
 
 ## Original beta scope
 
