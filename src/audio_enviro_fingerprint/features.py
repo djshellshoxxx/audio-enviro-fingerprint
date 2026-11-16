@@ -6,6 +6,7 @@ import math
 
 import numpy as np
 
+from .control import check_cancelled
 from .methods.noise import frame_level_summary, rms_dbfs
 from .methods.spectral import describe_spectrum
 
@@ -35,7 +36,7 @@ class AnalysisResult:
 
 
 def analyze_audio(samples: np.ndarray, sample_rate: int, frame_seconds: float = 2.0,
-                  hop_seconds: float = 1.0) -> AnalysisResult:
+                  hop_seconds: float = 1.0, *, should_cancel=None) -> AnalysisResult:
     samples = np.asarray(samples, dtype=np.float64)
     if samples.ndim != 1 or sample_rate <= 0:
         raise ValueError("Expected mono samples and a positive sample rate")
@@ -46,6 +47,7 @@ def analyze_audio(samples: np.ndarray, sample_rate: int, frame_seconds: float = 
     frames = []
     if samples.size >= frame_size:
         for start in range(0, samples.size - frame_size + 1, hop_size):
+            check_cancelled(should_cancel)
             segment = samples[start:start + frame_size]
             spectral = describe_spectrum(segment, sample_rate)
             frames.append(FrameFeature(start / sample_rate, rms_dbfs(segment),

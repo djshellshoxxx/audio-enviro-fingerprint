@@ -60,4 +60,28 @@ CI matrix: ubuntu-24.04 (tar.gz), windows-latest (zip), macos-latest/arm64 (zip 
 
 ## Known gaps
 
-No compressed-audio decode; whole file decoded in memory; no code signing/notarization; Intel macOS not built; thresholds uncalibrated; ENF, scene classification, and learned models not implemented.
+Full streaming decode is not implemented; whole file decoded in memory; no code signing/notarization; Intel macOS not built; thresholds uncalibrated; ENF, scene classification, and learned models not implemented.
+
+## Completion audit additions — 2026-10-22
+
+`load_audio` selects the strict native WAV parser for RIFF/RF64/WAV; other supported local files use the optional FFmpeg decoder. Its codec provenance is exported under `sections.audio.decoder`. No shell is used; protocol and demuxer allowlists exclude network and playlist inputs. A bounded temporary raw float file is removed on success or error. The decoded size cap fails closed rather than returning a partial recording.
+
+Recurrence computes one query column at a time: linear working memory in frame count (time remains quadratic). Existing distances, thresholds and result semantics are preserved.
+
+`analyze_file(..., cancel_event=threading.Event())` raises `AnalysisCancelled` and returns no partial result. GUI Cancel sets the event; the last completed analysis remains visible. Checkpoints cover stage boundaries and hashing/frame/recurrence loops. Decoder and musical stages are not immediately interruptible.
+
+Report and spectrogram exports use atomic replacement and reject destinations resolving to the source or sharing its inode. Marker revisions cannot change evidence ownership. Note and marker timestamps must be finite and nonnegative.
+
+Implementation references: [FFmpeg stream selection and options](https://ffmpeg.org/ffmpeg.html), [ffprobe JSON output and stream metadata](https://ffmpeg.org/ffprobe.html).
+
+## Branch reconciliation and v0.3 beta
+
+The active application retains v0.2 musical/hum/spectrogram UI modules while porting useful older work individually. `fingerprint.py` now uses the older branch's `aefp-2` canonical serialization: round floats to six decimal places and normalize negative zero. New hashes differ from `aefp-1`; comparisons reject mixed versions. Rounding reduces platform drift but cannot guarantee equality at rounding boundaries.
+
+`comparison-symmetric-v2` normalizes centroid differences by the maximum absolute centroid of both recordings (at least 100 Hz), so swapping input order preserves the score. Other existing scales and the exponential RMS score remain unchanged. The explicit method identifier distinguishes changed scores from earlier comparison output.
+
+`catalog.cluster_recordings(paths, max_distance=0.25)` analyzes 1–64 unique local paths, releases each decoded recording, compares every fingerprint pair, then merges the closest groups only when their maximum cross-group distance is at most the threshold. Distance is `1 - score`. Deterministic sorted input and tie ordering produce stable groups; all source hashes, decoder provenance, feature differences and pair explanations are emitted. Groups indicate descriptor similarity, not room/device identity. CLI: `audio-enviro-fingerprint cluster A.wav B.wav C.flac --max-distance 0.25`.
+
+Reference quality review additionally includes the older branch's DC-offset and silent-block/dropout checks. GUI reports include acquisition records and full marker revision history alongside current markers. Failed imports retain the previous evidence binding, preventing subsequent notes from attaching to a rejected file.
+
+See BENCHMARK_PROTOCOL.md for the ported synthetic benchmark and the outstanding field-data protocol. Broader legacy branch consolidation is not complete; incompatible segmentation, stores and GUI variants require deliberate comparison before integration.

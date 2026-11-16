@@ -12,10 +12,11 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import __version__
 from .case_store import CaseStore
+from .control import AnalysisCancelled
 from .comparison import compare_fingerprints
 from .fingerprint import make_fingerprint
 from .features import analyze_audio
-from .audio_io import load_wav
+from .audio_io import load_audio
 from .pipeline import analyze_file, full_report
 from .recurrence import find_recurrences
 from .report import write_report
@@ -34,6 +35,7 @@ class FingerprinterApp(tk.Tk):
         self.evidence_id = None
         self.jobs: queue.Queue = queue.Queue()
         self.busy = False
+        self.cancel_event = threading.Event()
         home = home or Path(os.environ.get("AEFP_HOME", Path.home() / ".audio-enviro-fingerprint"))
         self.store = CaseStore(Path(home) / "cases.sqlite3")
         self._build_ui()
@@ -63,10 +65,12 @@ class FingerprinterApp(tk.Tk):
                   style="Sub.TLabel").pack(anchor="w", pady=(2, 8))
         bar = ttk.Frame(outer)
         bar.pack(fill="x", pady=(0, 6))
-        for text, cmd in (("Open WAV… (Ctrl+O)", self.open_file), ("Compare recording…", self.compare_file),
+        for text, cmd in (("Open audio… (Ctrl+O)", self.open_file), ("Compare recording…", self.compare_file),
                           ("Find environment in other recording…", self.cross_recurrence),
                           ("Export report…", self.export_json), ("Export spectrogram PNG…", self.export_png)):
             ttk.Button(bar, text=text, command=cmd).pack(side="left", padx=(0, 6))
+        self.cancel_button = ttk.Button(bar, text="Cancel analysis", command=self.cancel_event.set, state="disabled")
+        self.cancel_button.pack(side="left", padx=(0, 6))
         self.file_label = ttk.Label(bar, text="No evidence loaded", style="Sub.TLabel")
         self.file_label.pack(side="right")
         self.hash_label = ttk.Label(outer, text="SHA-256: —", style="Sub.TLabel", wraplength=1100)
@@ -136,19 +140,21 @@ class FingerprinterApp(tk.Tk):
     def open_file(self):
         if self.busy:
             return
-        path = filedialog.askopenfilename(title="Select WAV recording",
-                                          filetypes=[("WAV audio", "*.wav"), ("All files", "*.*")])
+        path = filedialog.askopenfilename(title="Select audio recording",
+                                          filetypes=[("Audio recordings", "*.wav *.wave *.flac *.mp3 *.ogg *.opus *.m4a *.mp4"), ("All files", "*.*")])
         if path:
             self.start_analysis(path)
 
     def start_analysis(self, path):
         self.busy = True
+        self.cancel_event.clear()
+        self.cancel_button.configure(state="normal")
         self.progress.pack(fill="x", pady=(4, 0), before=self.notebook)
         self.progress_label.pack(anchor="w", before=self.notebook)
 
         def work():
             try:
-                self.jobs.put(("done", analyze_file(path, progress=lambda m, f: self.jobs.put(("progress", (m, f))))))
+                self.jobs.put(("done", analyze_file(path, progress=lambda m, f: self.jobs.put(("progress", (m, f))), cancel_event=self.cancel_event)))
             except Exception as exc:   # surfaced to the UI thread, never swallowed
                 self.jobs.put(("error", exc))
         threading.Thread(target=work, daemon=True).start()
@@ -169,23 +175,27 @@ class FingerprinterApp(tk.Tk):
 
     def _finish(self, kind, payload):
         self.busy = False
+        self.cancel_button.configure(state="disabled")
         self.progress.pack_forget()
         self.progress_label.pack_forget()
+        if kind == "error" and isinstance(payload, AnalysisCancelled):
+            return
         if kind == "error":
             messagebox.showerror("Unable to analyze recording", str(payload))
             return
         self.apply_result(payload)
 
     def apply_result(self, result):
-        self.evidence_id = self.store.register_evidence(result["path"])
-        if self.store.evidence_record(self.evidence_id)["sha256"] != result["sha256"]:
+        evidence_id = self.store.register_evidence(result["path"])
+        if self.store.evidence_record(evidence_id)["sha256"] != result["sha256"]:
             messagebox.showerror("Evidence changed", "The file changed while it was being loaded.")
             return
+        self.evidence_id = evidence_id
         self.result = result
         audio, fp = result["audio"], result["fingerprint"]
         self.file_label.configure(text=f"{result['path'].name} · {audio.duration_seconds:.2f} s · {audio.sample_rate} Hz · "
                                        f"{audio.channels} ch ({audio.sample_format}) · analyzing channel 1")
-        self.hash_label.configure(text=f"Evidence SHA-256: {result['sha256']}\nAcoustic fingerprint aefp-1: {fp.fingerprint_hash}")
+        self.hash_label.configure(text=f"Evidence SHA-256: {result['sha256']}\nAcoustic fingerprint {fp.version}: {fp.fingerprint_hash}")
         fill(self.transitions, [(f"{e.timestamp_seconds:.2f}", f"{e.strength:.3f}",
                                  ", ".join(f"{k} {v:+.2f}" for k, v in e.evidence.items())) for e in result["transitions"]])
         rows = []
@@ -224,18 +234,18 @@ class FingerprinterApp(tk.Tk):
     # ------------------------------------------------------------- actions
     def _require(self):
         if not self.result:
-            messagebox.showinfo("Load evidence", "Open a WAV file first.")
+            messagebox.showinfo("Load evidence", "Open an audio file first.")
             return False
         return True
 
     def compare_file(self):
         if not self._require():
             return
-        path = filedialog.askopenfilename(title="Select second WAV", filetypes=[("WAV audio", "*.wav")])
+        path = filedialog.askopenfilename(title="Select second recording", filetypes=[("Audio recordings", "*.wav *.wave *.flac *.mp3 *.ogg *.opus *.m4a *.mp4"), ("All files", "*.*")])
         if not path:
             return
         try:
-            other = load_wav(path)
+            other = load_audio(path)
             second = make_fingerprint(analyze_audio(other.samples, other.sample_rate))
             fp = self.result["fingerprint"]
             comparison = compare_fingerprints({"version": fp.version, "features": fp.features},
@@ -259,7 +269,7 @@ class FingerprinterApp(tk.Tk):
         if not self._require():
             return
         path = filedialog.askopenfilename(title="Search for this recording's environment in…",
-                                          filetypes=[("WAV audio", "*.wav")])
+                                          filetypes=[("Audio recordings", "*.wav *.wave *.flac *.mp3 *.ogg *.opus *.m4a *.mp4"), ("All files", "*.*")])
         if not path:
             return
         try:
@@ -293,7 +303,10 @@ class FingerprinterApp(tk.Tk):
             from .pipeline import report_sections
             from .report import build_report
             sections = report_sections(self.result, self.store.notes_for(self.evidence_id),
-                                       self.store.markers_for(self.evidence_id))
+                                       self.store.markers_for(self.evidence_id),
+                                       marker_history=self.store.markers_for(self.evidence_id, True),
+                                       references=[r for r in self.store.references()
+                                                   if r["evidence_id"] == self.evidence_id])
             write_report(target, build_report(self.result["path"], self.result["sha256"], sections))
             messagebox.showinfo("Export complete", f"Report with manifest written to {target}")
         except Exception as exc:
@@ -305,7 +318,11 @@ class FingerprinterApp(tk.Tk):
         target = filedialog.asksaveasfilename(title="Export spectrogram", defaultextension=".png",
                                               filetypes=[("PNG image", "*.png")])
         if target:
-            Path(target).write_bytes(self.spectrogram.png_bytes)
+            try:
+                from .integrity import write_export
+                write_export(target, self.spectrogram.png_bytes, self.result["path"])
+            except (ValueError, OSError) as exc:
+                messagebox.showerror("Export failed", str(exc))
 
     def _set_note_time(self, seconds):
         self.note_time.delete(0, "end")
@@ -364,6 +381,7 @@ class FingerprinterApp(tk.Tk):
         fill(self.markers_view, [(m["marker_key"], f"{m['timestamp_seconds']:.2f}", m["label"]) for m in markers])
 
     def _close(self):
+        self.cancel_event.set()
         self.store.close()
         self.destroy()
 

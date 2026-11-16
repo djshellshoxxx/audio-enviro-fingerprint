@@ -23,6 +23,7 @@ class AudioData:
     source_width_bytes: int
     all_channels: np.ndarray | None = field(default=None, repr=False, compare=False)
     sample_format: str = "pcm"
+    decoder: dict = field(default_factory=lambda: {"name": "aefp-wav", "version": "1"}, compare=False)
 
     @property
     def duration_seconds(self) -> float:
@@ -79,7 +80,9 @@ def _parse_riff(data: bytes) -> tuple[dict, bytes, int]:
         cid = data[pos:pos + 4]
         size = struct.unpack_from("<I", data, pos + 4)[0]
         body = pos + _MAX_CHUNK_HEADER
-        if cid == b"ds64" and size >= 24:
+        if cid == b"ds64":
+            if size < 28 or body + size > len(data):
+                raise ValueError("Corrupt RF64 ds64 chunk")
             riff_size, data_size, _sample_count = struct.unpack_from("<QQQ", data, body)
             rf64_sizes = {"data": data_size}
         if cid == b"data" and size == 0xFFFFFFFF and "data" in rf64_sizes:
@@ -87,11 +90,19 @@ def _parse_riff(data: bytes) -> tuple[dict, bytes, int]:
         if cid == b"fmt ":
             if size < 16 or body + size > len(data):
                 raise ValueError("Corrupt fmt chunk")
-            tag, ch, rate, _brate, _align, bits = struct.unpack_from("<HHIIHH", data, body)
+            tag, ch, rate, byte_rate, align, bits = struct.unpack_from("<HHIIHH", data, body)
             if tag == _FMT_EXTENSIBLE:
-                if size < 40:
+                if size < 40 or struct.unpack_from("<H", data, body + 16)[0] < 22:
                     raise ValueError("Corrupt WAVE_FORMAT_EXTENSIBLE chunk")
-                tag = struct.unpack_from("<H", data, body + 24)[0]
+                subtype = data[body + 24:body + 40]
+                if subtype[4:] != bytes.fromhex("00001000800000aa00389b71"):
+                    raise ValueError("Unsupported extensible audio subtype GUID")
+                tag = struct.unpack_from("<I", subtype)[0]
+                valid_bits = struct.unpack_from("<H", data, body + 18)[0]
+                if not 0 < valid_bits <= bits:
+                    raise ValueError("Invalid extensible valid-bit count")
+            if bits % 8 or align != ch * (bits // 8) or byte_rate != rate * align:
+                raise ValueError("Inconsistent WAV block alignment or byte rate")
             fmt = {"tag": tag, "channels": ch, "rate": rate, "bits": bits}
         elif cid == b"data":
             declared = size
@@ -130,3 +141,22 @@ def load_wav(path: str | Path) -> AudioData:
     # deterministically; the original multichannel file remains untouched.
     return AudioData(audio[:, 0], rate, channels, width, audio,
                      "float" if tag == _FMT_FLOAT else "pcm")
+
+
+def load_audio(path: str | Path, max_decoded_bytes: int = 512 * 1024 * 1024) -> AudioData:
+    """Read WAV natively or supported compressed audio through local FFmpeg.
+
+    The compressed decode limit applies to float64 interleaved sample bytes.
+    Original bytes remain untouched and are hashed by the analysis pipeline.
+    """
+    if not isinstance(max_decoded_bytes, int) or max_decoded_bytes <= 0:
+        raise ValueError("Decoded byte limit must be a positive integer")
+    path = Path(path).resolve(strict=True)
+    if not path.is_file():
+        raise ValueError("Audio input must be a regular local file")
+    with path.open("rb") as source:
+        header = source.read(12)
+    if header[:4] in (b"RIFF", b"RF64") or path.suffix.lower() in (".wav", ".wave"):
+        return load_wav(path)
+    from .codec_io import decode_compressed
+    return decode_compressed(path, max_decoded_bytes)

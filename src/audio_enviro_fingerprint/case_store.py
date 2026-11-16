@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 import sqlite3
 from datetime import datetime, timezone
@@ -66,8 +67,8 @@ class CaseStore:
         return int(row["id"])
 
     def add_note(self, evidence_id: int, timestamp_seconds: float, title: str, body: str) -> int:
-        if timestamp_seconds < 0:
-            raise ValueError("Note timestamp cannot be negative")
+        if not math.isfinite(timestamp_seconds) or timestamp_seconds < 0:
+            raise ValueError("Note timestamp must be finite and nonnegative")
         if not title.strip() or not body.strip():
             raise ValueError("Note title and body are required")
         created = datetime.now(timezone.utc).isoformat()
@@ -112,14 +113,17 @@ class CaseStore:
     def save_marker(self, evidence_id: int, timestamp_seconds: float | None, label: str,
                     marker_key: int | None = None, deleted: bool = False) -> int:
         """Create a manual segmentation marker or append a new revision; history is kept."""
+        if timestamp_seconds is not None and (not math.isfinite(timestamp_seconds) or timestamp_seconds < 0):
+            raise ValueError("Marker timestamp must be finite and nonnegative")
+        self.evidence_record(evidence_id)
         if not label.strip():
             raise ValueError("Marker label is required")
         if marker_key is None:
             row = self.connection.execute("SELECT COALESCE(MAX(marker_key),0)+1 FROM markers").fetchone()
             marker_key, revision = int(row[0]), 1
         else:
-            row = self.connection.execute("SELECT MAX(revision) FROM markers WHERE marker_key=?",
-                                          (marker_key,)).fetchone()
+            row = self.connection.execute("SELECT MAX(revision) FROM markers WHERE marker_key=? AND evidence_id=?",
+                                          (marker_key, evidence_id)).fetchone()
             if row[0] is None:
                 raise ValueError("Marker does not exist")
             revision = int(row[0]) + 1

@@ -2,7 +2,11 @@
 
 Cross-platform desktop beta for reproducible, explainable acoustic-environment screening. It computes a cryptographic hash of the original file separately from a versioned acoustic feature fingerprint.
 
-## Beta scope
+## Current development additions
+
+The v0.2 development line includes recurrence, guided reference records, per-channel/spatial metrics, musical/hum descriptors, spectrogram export, marker history, CLI, and manifest verification. The completion audit adds optional compressed input via local FFmpeg, decoder provenance, cooperative cancellation, linear-memory recurrence search, and evidence-safe atomic exports. See [current specifications](docs/SPECIFICATIONS_V2.md) and [build/dependency instructions](docs/BUILDING.md). Representative scientific validation and full streaming analysis remain outstanding.
+
+## Original beta scope
 
 - Reads uncompressed WAV: integer PCM (8/16/24/32 bit), IEEE float, WAVE_FORMAT_EXTENSIBLE, RF64.
 - Channel 1 drives the single-channel methods; all channels are kept for inter-channel analysis. No downmix; source is read only.

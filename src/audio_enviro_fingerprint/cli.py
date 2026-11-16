@@ -18,11 +18,11 @@ def _build_parser() -> argparse.ArgumentParser:
                                      description="Explainable acoustic environment screening.")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command", required=True)
-    a = sub.add_parser("analyze", help="analyze a WAV and write a verifiable JSON report")
+    a = sub.add_parser("analyze", help="analyze an audio recording and write a verifiable JSON report")
     a.add_argument("wav")
     a.add_argument("-o", "--output", help="report path (default: stdout)")
     a.add_argument("--no-musical", action="store_true", help="skip key/tempo/pitch analysis")
-    c = sub.add_parser("compare", help="explainable comparison of two WAV files")
+    c = sub.add_parser("compare", help="explainable comparison of two audio recordings")
     c.add_argument("first")
     c.add_argument("second")
     r = sub.add_parser("recurrence", help="find where the second recording's environment appears in the first")
@@ -31,6 +31,12 @@ def _build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("spectrogram", help="render a spectrogram PNG")
     s.add_argument("wav")
     s.add_argument("output")
+    c = sub.add_parser("cluster", help="group recording descriptors with transparent pair comparisons")
+    c.add_argument("recordings", nargs="+")
+    c.add_argument("--max-distance", type=float, default=0.25)
+    benchmark = sub.add_parser("benchmark", help="run synthetic software benchmark, not forensic validation")
+    benchmark.add_argument("--quick", action="store_true")
+    benchmark.add_argument("--seed", type=int, default=0)
     v = sub.add_parser("verify", help="verify a report manifest and its evidence hash")
     v.add_argument("report")
     return parser
@@ -59,10 +65,16 @@ def run(argv: list[str]) -> int:
             found = find_recurrences(x["analysis"], y["analysis"])
             print(json.dumps([m.to_dict() for m in found], indent=2, allow_nan=False))
         elif args.command == "spectrogram":
-            from .audio_io import load_wav
-            audio = load_wav(args.wav)
-            with open(args.output, "wb") as out:
-                out.write(spectrogram_png(audio.samples, audio.sample_rate))
+            from .audio_io import load_audio
+            audio = load_audio(args.wav)
+            from .integrity import write_export
+            write_export(args.output, spectrogram_png(audio.samples, audio.sample_rate), args.wav)
+        elif args.command == "cluster":
+            from .catalog import cluster_recordings
+            print(json.dumps(cluster_recordings(args.recordings, args.max_distance), indent=2, allow_nan=False))
+        elif args.command == "benchmark":
+            from .benchmark import run_benchmark
+            print(json.dumps(run_benchmark(args.seed, args.quick), indent=2, sort_keys=True, allow_nan=False))
         elif args.command == "verify":
             result = verify_report(args.report)
             print(json.dumps(result))

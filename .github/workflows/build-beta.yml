@@ -34,6 +34,9 @@ jobs:
           python-version: "3.12"
       - name: Install project and builder
         run: python -m pip install --upgrade pip && python -m pip install . pyinstaller
+      - name: Install Linux codec and display test dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
       - name: Run tests
         run: python -m unittest discover -s tests -v
         env:

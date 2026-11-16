@@ -1,6 +1,6 @@
 # Future feature backlog
 
-All ideas here are unimplemented unless explicitly marked otherwise. Prioritize scientific validation and provenance before adding learned classification.
+Historical research backlog. V0.2 now implements candidate recurrence, transparent feature comparisons, guided reference records, multichannel review, manual marker revisions, and manifest verification; see SPECIFICATIONS_V2.md. Other ideas below remain unimplemented unless explicitly marked. Prioritize scientific validation and provenance before adding learned classification.
 
 ## Three distinctive features requested for this project
 
