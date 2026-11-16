@@ -169,8 +169,12 @@ def pitch_track(samples: np.ndarray, sample_rate: int, fmin: float = 60.0, fmax:
             a, b, c = cmnd[tau - 1], cmnd[tau], cmnd[min(tau + 1, tau_max)]
             denom = a - 2 * b + c
             tau_f = tau + (0.5 * (a - c) / denom if denom else 0.0)
-            out.append({"time_s": n * hop / sample_rate, "f0_hz": float(sample_rate / tau_f),
-                        "confidence": float(1.0 - b)})
+            f0 = float(sample_rate / tau_f) if tau_f > 0 else None
+            # Interpolation can escape the bounded lag search. Report such a
+            # frame as unvoiced rather than inventing a boundary frequency.
+            valid = f0 is not None and fmin <= f0 <= fmax
+            out.append({"time_s": n * hop / sample_rate, "f0_hz": f0 if valid else None,
+                        "confidence": float(np.clip(1.0 - b, 0.0, 1.0)) if valid else 0.0})
         else:
             out.append({"time_s": n * hop / sample_rate, "f0_hz": None, "confidence": 0.0})
     return out
@@ -193,8 +197,9 @@ def estimate_tempo(samples: np.ndarray, sample_rate: int, bpm_min: float = 40.0,
     rate = sample_rate / hop
     acf = np.correlate(flux, flux, "full")[flux.size - 1:]
     acf = acf / acf[0]
-    lag_lo, lag_hi = max(1, int(rate * 60 / bpm_max)), min(int(rate * 60 / bpm_min), acf.size - 1)
-    if lag_hi <= lag_lo + 1:
+    lag_lo = max(1, int(np.ceil(rate * 60 / bpm_max)))
+    lag_hi = min(int(np.floor(rate * 60 / bpm_min)), acf.size - 1)
+    if lag_hi < lag_lo:
         return {"bpm": None, "confidence": 0.0, "onset_count": 0}
     lags = np.arange(lag_lo, lag_hi + 1)
     # mild log-Gaussian prior around 120 BPM suppresses octave errors

@@ -117,3 +117,19 @@ long power-of-two window so a ±0.5 Hz harmonic band contains a frequency bin.
 Insufficient duration is reported as unavailable rather than a measured absence;
 the GUI shows that distinction and the resolution. These are numerical and
 resolution corrections, not ENF calibration or validation of physical attribution.
+
+## Audited 0.3.0b2 contracts and usability
+
+Native WAV and compressed inputs apply an inclusive decoded float64 sample cap across all channels (default 512 MiB). Metadata reads are bounded, ancillary WAV chunks are skipped, and RF64 ds64 ancillary table entries are consumed in order, including repeated IDs. This is not full streaming or a total-process memory guarantee.
+
+`integrity.evidence_stat(path)` rejects nonregular files and returns a `(dev, inode, size, mtime_ns, ctime_ns)` token. Hashing validates a positive non-bool chunk size. Pipeline results include `source_stat`; hash and ordinary file identity/metadata must stay stable throughout analysis. The GUI's verified-registration path checks that token and stores the pinned digest without rehashing on Tk. Tokens do not establish authenticity or eliminate adversarial filesystem races.
+
+Within-recording recurrence chooses the nearest reference satisfying all distance, elapsed-time gap and intervening-departure conditions. Actual frame timestamps and sample-quantized window lengths determine intervals; float-rounding tolerance preserves exact gap boundaries. Working memory remains linear and time remains quadratic. Silent/DC-only channel pairs emit null lag fields and `lag_available=false`; no apparent physical delay is invented. Tempo and voiced pitch stay inside configured bounds. Valid `aefp-2` canonical bytes remain unchanged.
+
+The desktop supports recent successful opens, quick analysis (skip music), clock-format annotation input, timeline/transition navigation, and marker editing through append-only revisions. All long-running analysis/compare/search/report operations use worker jobs with busy/cancel handling. Spectrogram presentation and PNG export remain in-memory UI work. New evidence clears old musical/reference data. Preferences reads are bounded to 64 KiB; unknown existing bytes are preserved, with session-only history when persistence is unsafe.
+
+`report_sections` / `full_report` accept optional `recurrence_history`. CaseStore saves evidence-bound run parameters/findings append-only. Current connection SQL guards protect evidence, notes, references, marker revisions and recurrence runs from accidental UPDATE/DELETE/REPLACE, including implicit REPLACE deletion; they do not protect against a database owner changing the connection or schema.
+
+`analyze FILE --format json|html [-o OUTPUT]` defaults to JSON. HTML is an escaped static printable view retaining the report record, hashes, values and caveats. The desktop chooses HTML for `.html`/`.htm` output names. JSON remains the input for `verify`; HTML formatting is not itself covered by the JSON manifest. Both exporters recheck evidence and protect source/database aliases.
+
+All ten remote branch histories are reconciled into the delivery branch. Compatible work is adapted to current APIs; divergent segment methods/stores are explicitly superseded rather than silently replacing current algorithms. See BRANCH_RECONCILIATION.md and DELIVERY_AUDIT.md for exact dispositions, checks and continuing research limitations.

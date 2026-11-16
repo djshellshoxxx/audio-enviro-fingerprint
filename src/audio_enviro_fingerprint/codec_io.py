@@ -44,7 +44,7 @@ def decode_compressed(path: Path, max_decoded_bytes: int) -> AudioData:
                        '-c:a', 'pcm_f64le', '-f', 'f64le', '-fs', str(max_decoded_bytes + 1), str(decoded)]
             subprocess.run(command, capture_output=True, timeout=300, check=True)
             size = decoded.stat().st_size
-            if size >= max_decoded_bytes:
+            if size > max_decoded_bytes:
                 raise ValueError('Decoded audio exceeds the configured memory limit')
             if not size or size % (8 * channels):
                 raise ValueError('Decoder returned empty or partial audio frames')

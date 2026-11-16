@@ -18,6 +18,7 @@ class CaseStore:
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript("""
             PRAGMA foreign_keys = ON;
+            PRAGMA recursive_triggers = ON;
             CREATE TABLE IF NOT EXISTS evidence (
                 id INTEGER PRIMARY KEY,
                 source_path TEXT NOT NULL,
@@ -51,12 +52,55 @@ class CaseStore:
                 created_utc TEXT NOT NULL,
                 UNIQUE(marker_key, revision)
             );
+            CREATE TABLE IF NOT EXISTS recurrence_runs (
+                id INTEGER PRIMARY KEY,
+                evidence_id INTEGER NOT NULL REFERENCES evidence(id),
+                parameters_json TEXT NOT NULL,
+                findings_json TEXT NOT NULL,
+                created_utc TEXT NOT NULL
+            );
         """)
+        # Preserve existing schemas and rows while protecting the append-only
+        # audit trail, including databases created by earlier releases. These
+        # Recursive triggers make REPLACE's implicit deletions fire the delete
+        # guards even when the conflicting logical key is inserted without id.
+        # These connection-scoped guards prevent accidental mutation, not a
+        # malicious database owner using another connection or changing PRAGMAs.
+        for table in ("evidence", "notes", "reference_records", "markers", "recurrence_runs"):
+            self.connection.executescript(f"""
+                CREATE TRIGGER IF NOT EXISTS {table}_no_update BEFORE UPDATE ON {table}
+                BEGIN SELECT RAISE(ABORT, 'Case audit records are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS {table}_no_delete BEFORE DELETE ON {table}
+                BEGIN SELECT RAISE(ABORT, 'Case audit records are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS {table}_no_replace BEFORE INSERT ON {table}
+                WHEN EXISTS (SELECT 1 FROM {table} WHERE id = NEW.id)
+                BEGIN SELECT RAISE(ABORT, 'Case audit record id already exists'); END;
+            """)
         self.connection.commit()
 
     def register_evidence(self, source_path: str | Path) -> int:
         source = Path(source_path).expanduser().resolve()
         digest = sha256_file(source)
+        return self._insert_evidence(source, digest)
+
+    def register_verified_evidence(self, source_path: str | Path, evidence_sha256: str,
+                                   source_stat: tuple) -> int:
+        """Store the pipeline's pinned hash without rehashing on Tk's thread.
+
+        The stat token detects ordinary file changes after worker completion;
+        it is not a guarantee against adversarial filesystem races.
+        """
+        from .integrity import evidence_stat
+
+        if (not isinstance(evidence_sha256, str) or len(evidence_sha256) != 64
+                or any(c not in '0123456789abcdefABCDEF' for c in evidence_sha256)):
+            raise ValueError("Evidence SHA-256 must contain 64 hexadecimal characters")
+        source = Path(source_path).expanduser().resolve(strict=True)
+        if evidence_stat(source) != source_stat:
+            raise ValueError("Evidence changed after analysis; reopen a stable copy")
+        return self._insert_evidence(source, evidence_sha256.lower())
+
+    def _insert_evidence(self, source: Path, digest: str) -> int:
         created = datetime.now(timezone.utc).isoformat()
         self.connection.execute(
             "INSERT OR IGNORE INTO evidence(source_path,sha256,first_seen_utc) VALUES(?,?,?)",
@@ -144,6 +188,26 @@ class CaseStore:
         latest = {r["marker_key"]: r for r in rows}
         return sorted((r for r in latest.values() if not r["deleted"]),
                       key=lambda r: (r["timestamp_seconds"] is None, r["timestamp_seconds"] or 0))
+
+    def save_recurrence_run(self, evidence_id: int, parameters: dict, findings: list[dict]) -> int:
+        """Append one screening run, preserving the method settings and findings."""
+        self.evidence_record(evidence_id)
+        if not isinstance(parameters, dict) or not isinstance(findings, list):
+            raise ValueError("Recurrence settings must be an object and findings a list")
+        parameters_json = json.dumps(parameters, sort_keys=True, allow_nan=False)
+        findings_json = json.dumps(findings, sort_keys=True, allow_nan=False)
+        cursor = self.connection.execute(
+            "INSERT INTO recurrence_runs(evidence_id,parameters_json,findings_json,created_utc) VALUES(?,?,?,?)",
+            (evidence_id, parameters_json, findings_json, datetime.now(timezone.utc).isoformat()))
+        self.connection.commit()
+        return int(cursor.lastrowid)
+
+    def recurrence_runs_for(self, evidence_id: int) -> list[dict]:
+        rows = self.connection.execute(
+            "SELECT * FROM recurrence_runs WHERE evidence_id=? ORDER BY id", (evidence_id,)).fetchall()
+        return [{"id": r["id"], "evidence_id": r["evidence_id"], "created_utc": r["created_utc"],
+                 "parameters": json.loads(r["parameters_json"]), "findings": json.loads(r["findings_json"])}
+                for r in rows]
 
     def close(self) -> None:
         self.connection.close()

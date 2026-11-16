@@ -28,7 +28,7 @@ The resulting application folder is in `dist/AudioEnvironmentFingerprinter`. Win
 
 ## Beta build identifiers
 
-The source version is `0.3.0b1`. CI names artifacts by operating system and source ref. The first published binaries remain provisional until launched and smoke-tested on their target systems.
+The source version is `0.3.0b2`. CI names artifacts by operating system and source ref. The first published binaries remain provisional until launched and smoke-tested on their target systems.
 
 
 ## Optional compressed input
@@ -37,7 +37,7 @@ Install `ffmpeg` and `ffprobe` and put both on PATH. They are not bundled or req
 
 Compressed input uses the first audio stream, preserving its channel count and sample rate. Supported decoder names are FLAC, MP3, Vorbis, Opus, AAC and ALAC in FLAC/MP3/Ogg/MOV-family containers. Automated real-codec integration currently covers FLAC and MP3. Reports record decoder version, codec and output representation. Lossy decoding changes the measured waveform; the evidence digest still covers original bytes.
 
-Compressed decoding has a 512 MiB decoded-float limit and a 300-second timeout; reaching the limit is an error, never a partial result. Native WAV loading and later analysis still load whole recordings into memory. Cancellation is cooperative: hashing, frame extraction and recurrence check inside loops; decoding and musical analysis finish their current stage before observing cancellation.
+Native and compressed decoding have a 512 MiB limit on decoded float64 samples across all channels. A complete decode exactly at the limit is accepted; exceeding it fails without returning a partial result. Compressed decoding also has a 300-second timeout. Native WAV loading and later analysis still load whole recordings into memory. Cancellation is cooperative: hashing, frame extraction and recurrence check inside loops; decoding and musical analysis finish their current stage before observing cancellation.
 
 ## Cloud-host Python library discovery
 

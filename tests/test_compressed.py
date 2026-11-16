@@ -14,6 +14,19 @@ from test_extended import tone, write_wav
 
 @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg tools not installed')
 class CompressedAudioTests(unittest.TestCase):
+    def test_exact_decoded_limit_accepts_complete_lossless_audio(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source, encoded = Path(tmp) / 'source.wav', Path(tmp) / 'audio.flac'
+            samples = np.stack([tone(440, 0.1), -tone(440, 0.1)], axis=1)
+            write_wav(source, samples, channels=2)
+            subprocess.run(['ffmpeg', '-v', 'error', '-i', str(source), str(encoded)], check=True)
+            limit = samples.size * 8
+            audio = load_audio(encoded, max_decoded_bytes=limit)
+            self.assertEqual(audio.all_channels.shape, samples.shape)
+            np.testing.assert_array_equal(audio.all_channels, load_audio(source).all_channels)
+            with self.assertRaisesRegex(ValueError, 'limit'):
+                load_audio(encoded, max_decoded_bytes=limit - 1)
+
     def test_lossless_stereo_decode_and_source_provenance(self):
         with tempfile.TemporaryDirectory() as tmp:
             source, encoded = Path(tmp) / 'source.wav', Path(tmp) / 'audio.flac'

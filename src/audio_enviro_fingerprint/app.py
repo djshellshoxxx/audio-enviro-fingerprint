@@ -12,16 +12,31 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import __version__
 from .case_store import CaseStore
-from .control import AnalysisCancelled
+from .control import AnalysisCancelled, check_cancelled
 from .comparison import compare_fingerprints
-from .fingerprint import make_fingerprint
-from .features import analyze_audio
-from .audio_io import load_audio
-from .pipeline import analyze_file, full_report
+from .pipeline import analyze_file
 from .recurrence import find_recurrences
 from .report import write_report
+from .preferences import load_recent, remember_recent
+from .timecode import parse_timecode
 from .ui_tabs import (BG, FG, MUTED, ACCENT, ChannelsTab, MusicalTab, RecurrenceTab, ReferenceTab,
-                      SpectrogramTab, fill, heading, tree)
+                      SpectrogramTab, ScrollableTab, fill, heading, tree)
+
+
+def compare_recording(first, path, *, cancel_event=None, progress=None):
+    """Worker operation: compare a pinned result to a newly verified recording."""
+    other = analyze_file(path, musical=False, cancel_event=cancel_event, progress=progress)
+    a, b = first["fingerprint"], other["fingerprint"]
+    return compare_fingerprints({"version": a.version, "features": a.features},
+                                {"version": b.version, "features": b.features})
+
+
+def search_recording(reference, path, *, cancel_event=None, progress=None):
+    """Worker operation: find every matching segment in the selected recording."""
+    other = analyze_file(path, musical=False, cancel_event=cancel_event, progress=progress)
+    found = find_recurrences(other["analysis"], reference["analysis"],
+                            should_cancel=cancel_event.is_set if cancel_event is not None else None)
+    return other["path"], found
 
 
 class FingerprinterApp(tk.Tk):
@@ -37,6 +52,9 @@ class FingerprinterApp(tk.Tk):
         self.busy = False
         self.cancel_event = threading.Event()
         home = home or Path(os.environ.get("AEFP_HOME", Path.home() / ".audio-enviro-fingerprint"))
+        self.preferences_path = Path(home) / "preferences.json"
+        self.recent_paths = load_recent(self.preferences_path)
+        self.quick_analysis = tk.BooleanVar(self, value=False)
         self.store = CaseStore(Path(home) / "cases.sqlite3")
         self._build_ui()
         self.bind_all("<Control-o>", lambda _e: self.open_file())
@@ -65,14 +83,22 @@ class FingerprinterApp(tk.Tk):
                   style="Sub.TLabel").pack(anchor="w", pady=(2, 8))
         bar = ttk.Frame(outer)
         bar.pack(fill="x", pady=(0, 6))
-        for text, cmd in (("Open audio… (Ctrl+O)", self.open_file), ("Compare recording…", self.compare_file),
+        for index, (text, cmd) in enumerate((("Open audio… (Ctrl+O)", self.open_file), ("Compare recording…", self.compare_file),
                           ("Find environment in other recording…", self.cross_recurrence),
-                          ("Export report…", self.export_json), ("Export spectrogram PNG…", self.export_png)):
-            ttk.Button(bar, text=text, command=cmd).pack(side="left", padx=(0, 6))
+                          ("Export report…", self.export_json), ("Export spectrogram PNG…", self.export_png))):
+            ttk.Button(bar, text=text, command=cmd).grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 6), pady=2)
         self.cancel_button = ttk.Button(bar, text="Cancel analysis", command=self.cancel_event.set, state="disabled")
-        self.cancel_button.pack(side="left", padx=(0, 6))
-        self.file_label = ttk.Label(bar, text="No evidence loaded", style="Sub.TLabel")
-        self.file_label.pack(side="right")
+        self.cancel_button.grid(row=1, column=2, sticky="w", padx=(0, 6), pady=2)
+        self.file_label = ttk.Label(outer, text="No evidence loaded", style="Sub.TLabel", wraplength=1100)
+        self.file_label.pack(anchor="w")
+        options = ttk.Frame(outer)
+        options.pack(fill="x", pady=(0, 4))
+        self.recent_button = ttk.Menubutton(options, text="Recent recordings")
+        self.recent_menu = tk.Menu(self.recent_button, tearoff=False)
+        self.recent_button.configure(menu=self.recent_menu)
+        self.recent_button.pack(side="left")
+        self._refresh_recent_menu()
+        ttk.Checkbutton(options, text="Quick analysis (skip musical descriptors)", variable=self.quick_analysis).pack(side="left", padx=12)
         self.hash_label = ttk.Label(outer, text="SHA-256: —", style="Sub.TLabel", wraplength=1100)
         self.hash_label.pack(anchor="w")
         self.progress = ttk.Progressbar(outer, mode="determinate", maximum=1.0)
@@ -94,28 +120,37 @@ class FingerprinterApp(tk.Tk):
             self.notebook.add(tab, text=title)
         ttk.Label(outer, text="Screening aid only. Similarity does not identify a physical location or establish authenticity.",
                   style="Sub.TLabel").pack(anchor="w", pady=(6, 0))
+        outer.bind("<Configure>", self._wrap_evidence_labels)
+
+    def _wrap_evidence_labels(self, event):
+        for label in (self.file_label, self.hash_label):
+            label.configure(wraplength=max(120, event.width - 28))
 
     def _analysis_tab(self):
-        tab = ttk.Frame(self.notebook, padding=12)
-        self.notebook.add(tab, text="Analysis")
+        scroll = ScrollableTab(self.notebook)
+        self.notebook.add(scroll, text="Analysis")
+        tab = scroll.content
         heading(tab, "Transition candidates")
         self.timeline = tk.Canvas(tab, height=90, background="#0b1220", highlightthickness=0)
         self.timeline.pack(fill="x", pady=(0, 8))
         self.timeline.bind("<Configure>", lambda _e: self._draw_timeline())
+        self.timeline.bind("<Button-1>", self._timeline_click)
         frame, self.transitions = tree(tab, [("time", "Time (s)", 100), ("strength", "Change score", 120),
                                              ("evidence", "Measured changes", 800)], 6)
         frame.pack(fill="x")
+        self.transitions.bind("<<TreeviewSelect>>", self._transition_selected)
         heading(tab, "Median fingerprint features")
         frame, self.features = tree(tab, [("feature", "Feature", 300), ("value", "Measured value", 300)], 8)
         frame.pack(fill="both", expand=True)
 
     def _notes_tab(self):
-        tab = self.notes_tab = ttk.Frame(self.notebook, padding=12)
+        self.notes_tab = ScrollableTab(self.notebook)
+        tab = self.notes_tab.content
         ttk.Label(tab, text="Notes and markers are saved with the evidence SHA-256. Marker edits keep revision history.",
                   style="Sub.TLabel").pack(anchor="w", pady=(0, 6))
         form = ttk.Frame(tab)
         form.pack(fill="x")
-        ttk.Label(form, text="Time (s)").grid(row=0, column=0)
+        ttk.Label(form, text="Time (s or HH:MM:SS)").grid(row=0, column=0)
         self.note_time = ttk.Entry(form, width=12)
         self.note_time.insert(0, "0")
         self.note_time.grid(row=0, column=1, padx=8)
@@ -131,10 +166,12 @@ class FingerprinterApp(tk.Tk):
         ttk.Button(row, text="Save timestamped note", command=self.save_note).pack(side="left")
         ttk.Button(row, text="Add marker at time", command=self.add_marker).pack(side="left", padx=8)
         ttk.Button(row, text="Delete selected marker", command=self.delete_marker).pack(side="left")
+        ttk.Button(row, text="Save selected marker edit", command=self.edit_marker).pack(side="left", padx=8)
         frame, self.notes_view = tree(tab, [("time", "Time (s)", 90), ("title", "Title", 200), ("body", "Observation", 700)], 6)
         frame.pack(fill="both", expand=True, pady=6)
         frame, self.markers_view = tree(tab, [("key", "Marker", 70), ("time", "Time (s)", 90), ("label", "Label", 500)], 5)
         frame.pack(fill="x")
+        self.markers_view.bind("<<TreeviewSelect>>", self._marker_selected)
 
     # ------------------------------------------------------------ analysis
     def open_file(self):
@@ -145,16 +182,45 @@ class FingerprinterApp(tk.Tk):
         if path:
             self.start_analysis(path)
 
+    def _refresh_recent_menu(self):
+        self.recent_menu.delete(0, "end")
+        for path in self.recent_paths:
+            self.recent_menu.add_command(label=path, command=lambda p=path: self._open_recent(p))
+        if not self.recent_paths:
+            self.recent_menu.add_command(label="No recently opened recordings", state="disabled")
+
+    def _open_recent(self, path):
+        if self.busy:
+            return
+        if not Path(path).is_file():
+            messagebox.showerror("Recording unavailable", f"The recent recording is missing or unreadable:\n{path}\nOpen its new location to continue.")
+            return
+        self.start_analysis(path)
+
     def start_analysis(self, path):
+        if self.busy:
+            return
+        musical = not self.quick_analysis.get()
+        self._start_job("Analyzing recording", lambda: analyze_file(path,
+            musical=musical, progress=lambda m, f: self.jobs.put(("progress", (m, f))),
+            cancel_event=self.cancel_event), "done")
+
+    def _start_job(self, message, operation, done_kind):
+        if self.busy:
+            return
         self.busy = True
         self.cancel_event.clear()
-        self.cancel_button.configure(state="normal")
+        self.cancel_button.configure(state="normal", text="Cancel operation")
+        self.progress.configure(value=0)
+        self.progress_label.configure(text=message)
         self.progress.pack(fill="x", pady=(4, 0), before=self.notebook)
         self.progress_label.pack(anchor="w", before=self.notebook)
 
         def work():
             try:
-                self.jobs.put(("done", analyze_file(path, progress=lambda m, f: self.jobs.put(("progress", (m, f))), cancel_event=self.cancel_event)))
+                payload = operation()
+                check_cancelled(self.cancel_event.is_set)
+                self.jobs.put((done_kind, payload))
             except Exception as exc:   # surfaced to the UI thread, never swallowed
                 self.jobs.put(("error", exc))
         threading.Thread(target=work, daemon=True).start()
@@ -189,12 +255,29 @@ class FingerprinterApp(tk.Tk):
         if kind == "error":
             messagebox.showerror("Unable to analyze recording", str(payload))
             return
+        if self.cancel_event.is_set():
+            return
+        if kind == "comparison_done":
+            self._show_comparison(payload)
+            return
+        if kind == "search_done":
+            self._show_search(*payload)
+            return
         self.apply_result(payload)
 
     def apply_result(self, result):
-        evidence_id = self.store.register_evidence(result["path"])
-        if self.store.evidence_record(evidence_id)["sha256"] != result["sha256"]:
-            messagebox.showerror("Evidence changed", "The file changed while it was being loaded.")
+        try:
+            if "source_stat" in result:
+                evidence_id = self.store.register_verified_evidence(result["path"], result["sha256"], result["source_stat"])
+            else:  # Compatibility with callers supplying pre-token results.
+                evidence_id = self.store.register_evidence(result["path"])
+            if self.store.evidence_record(evidence_id)["sha256"] != result["sha256"]:
+                raise ValueError("The file changed while it was being loaded. Open a stable copy again.")
+            self.store.save_recurrence_run(evidence_id,
+                result["recurrence_parameters"],
+                [r.to_dict() for r in result["recurrences"]])
+        except Exception as exc:
+            messagebox.showerror("Unable to load evidence", str(exc))
             return
         self.evidence_id = evidence_id
         self.result = result
@@ -217,7 +300,25 @@ class FingerprinterApp(tk.Tk):
         self._draw_timeline()
         for tab in (self.spectrogram, self.musical, self.recurrence, self.channels):
             tab.update_result(result)
+        self.reference.reset_for_recording()
         self._load_notes()
+        if hasattr(self, "preferences_path"):
+            self.recent_paths = remember_recent(self.preferences_path, result["path"], previous=self.recent_paths)
+            self._refresh_recent_menu()
+        self.note_time.delete(0, "end")
+        self.note_time.insert(0, "0")
+
+    def _timeline_click(self, event):
+        if self.result:
+            width = max(self.timeline.winfo_width(), 600)
+            fraction = max(0.0, min(1.0, (event.x - 24) / (width - 48)))
+            self._set_note_time(fraction * self.result["audio"].duration_seconds)
+
+    def _transition_selected(self, _event=None):
+        selected = self.transitions.selection()
+        if selected and self.result:
+            index = self.transitions.index(selected[0])
+            self._set_note_time(self.result["transitions"][index].timestamp_seconds)
 
     def _draw_timeline(self):
         c = self.timeline
@@ -245,20 +346,17 @@ class FingerprinterApp(tk.Tk):
         return True
 
     def compare_file(self):
-        if not self._require():
+        if self.busy or not self._require():
             return
         path = filedialog.askopenfilename(title="Select second recording", filetypes=[("Audio recordings", "*.wav *.wave *.flac *.mp3 *.ogg *.opus *.m4a *.mp4"), ("All files", "*.*")])
         if not path:
             return
-        try:
-            other = load_audio(path)
-            second = make_fingerprint(analyze_audio(other.samples, other.sample_rate))
-            fp = self.result["fingerprint"]
-            comparison = compare_fingerprints({"version": fp.version, "features": fp.features},
-                                              {"version": second.version, "features": second.features})
-        except Exception as exc:
-            messagebox.showerror("Comparison failed", str(exc))
-            return
+        first = self.result
+        self._start_job("Comparing recordings", lambda: compare_recording(first, path,
+            cancel_event=self.cancel_event, progress=lambda m, f: self.jobs.put(("progress", (m, f)))),
+            "comparison_done")
+
+    def _show_comparison(self, comparison):
         win = tk.Toplevel(self)
         win.title("Explainable comparison")
         win.configure(background=BG)
@@ -272,26 +370,26 @@ class FingerprinterApp(tk.Tk):
                     for k, v in sorted(comparison.differences.items(), key=lambda kv: -kv[1]["normalized_delta"])])
 
     def cross_recurrence(self):
-        if not self._require():
+        if self.busy or not self._require():
             return
         path = filedialog.askopenfilename(title="Search for this recording's environment in…",
                                           filetypes=[("Audio recordings", "*.wav *.wave *.flac *.mp3 *.ogg *.opus *.m4a *.mp4"), ("All files", "*.*")])
         if not path:
             return
-        try:
-            other = analyze_file(path, musical=False)
-            found = find_recurrences(self.result["analysis"], other["analysis"])
-        except Exception as exc:
-            messagebox.showerror("Search failed", str(exc))
-            return
+        reference = self.result
+        self._start_job("Searching the selected recording", lambda: search_recording(reference, path,
+            cancel_event=self.cancel_event, progress=lambda m, f: self.jobs.put(("progress", (m, f)))),
+            "search_done")
+
+    def _show_search(self, path, found):
         win = tk.Toplevel(self)
-        win.title(f"Matches in {other['path'].name}")
+        win.title(f"Matches in {Path(path).name}")
         win.configure(background=BG)
         frame, view = tree(win, [("id", "ID", 50), ("here", "This recording (s)", 150), ("there", "Other recording (s)", 150),
                                  ("d", "Mean distance", 110)], 12)
         frame.pack(fill="both", expand=True, padx=12, pady=12)
-        fill(view, [(r.segment_id, f"{r.later_start_s:.0f}–{r.later_end_s:.0f}",
-                     f"{r.earlier_start_s:.0f}–{r.earlier_end_s:.0f}", f"{r.mean_distance:.3f}") for r in found])
+        fill(view, [(r.segment_id, f"{r.earlier_start_s:.2f}–{r.earlier_end_s:.2f}",
+                     f"{r.later_start_s:.2f}–{r.later_end_s:.2f}", f"{r.mean_distance:.3f}") for r in found])
         ttk.Label(win, text=f"{len(found)} candidate segment(s). Candidates only; not an identification.",
                   style="Sub.TLabel").pack(anchor="w", padx=12, pady=(0, 10))
 
@@ -299,7 +397,7 @@ class FingerprinterApp(tk.Tk):
         if self.busy or not self._require():
             return
         target = filedialog.asksaveasfilename(title="Export report", defaultextension=".json",
-                                              filetypes=[("JSON report", "*.json")])
+                                              filetypes=[("Verifiable JSON report", "*.json"), ("Readable HTML report", "*.html")])
         if not target:
             return
         try:
@@ -308,7 +406,8 @@ class FingerprinterApp(tk.Tk):
                                        self.store.markers_for(self.evidence_id),
                                        marker_history=self.store.markers_for(self.evidence_id, True),
                                        references=[r for r in self.store.references()
-                                                   if r["evidence_id"] == self.evidence_id])
+                                                   if r["evidence_id"] == self.evidence_id],
+                                       recurrence_history=self.store.recurrence_runs_for(self.evidence_id))
             self._start_report_export(target, self.result["path"], self.result["sha256"], sections)
         except Exception as exc:
             messagebox.showerror("Export failed", str(exc))
@@ -329,8 +428,13 @@ class FingerprinterApp(tk.Tk):
             try:
                 from .report import build_report
                 report = build_report(source, digest, sections)
-                write_report(target, report, protected_paths=protected_paths,
-                             should_cancel=self.cancel_event.is_set)
+                if Path(target).suffix.lower() in (".html", ".htm"):
+                    from .html_report import write_html_report
+                    write_html_report(target, report, protected_paths=protected_paths,
+                                      should_cancel=self.cancel_event.is_set)
+                else:
+                    write_report(target, report, protected_paths=protected_paths,
+                                 should_cancel=self.cancel_event.is_set)
                 self.jobs.put(("export_done", target))
             except Exception as exc:
                 self.jobs.put(("export_error", exc))
@@ -338,7 +442,7 @@ class FingerprinterApp(tk.Tk):
         self.after(50, self._poll)
 
     def export_png(self):
-        if not self._require():
+        if self.busy or not self._require():
             return
         target = filedialog.asksaveasfilename(title="Export spectrogram", defaultextension=".png",
                                               filetypes=[("PNG image", "*.png")])
@@ -352,10 +456,10 @@ class FingerprinterApp(tk.Tk):
 
     def _set_note_time(self, seconds):
         self.note_time.delete(0, "end")
-        self.note_time.insert(0, f"{seconds:.2f}")
+        self.note_time.insert(0, repr(float(seconds)))
 
     def _timestamp(self):
-        t = float(self.note_time.get())
+        t = parse_timecode(self.note_time.get())
         if self.result and t > self.result["audio"].duration_seconds:
             raise ValueError("Timestamp is beyond the recording duration")
         return t
@@ -382,11 +486,40 @@ class FingerprinterApp(tk.Tk):
             messagebox.showerror("Unable to add marker", str(exc))
 
     def delete_marker(self):
-        selected = self.markers_view.selection()
-        if selected and self.evidence_id:
-            values = self.markers_view.item(selected[0], "values")
-            self.store.save_marker(self.evidence_id, float(values[1]), values[2], int(values[0]), deleted=True)
+        try:
+            marker = self._selected_marker()
+            if marker is None:
+                return
+            self.store.save_marker(self.evidence_id, marker["timestamp_seconds"], marker["label"],
+                                   marker["marker_key"], deleted=True)
             self._load_notes()
+        except Exception as exc:
+            messagebox.showerror("Unable to delete marker", str(exc))
+
+    def _selected_marker(self):
+        selected = self.markers_view.selection()
+        if not selected or not self.evidence_id:
+            return None
+        key = int(self.markers_view.item(selected[0], "values")[0])
+        return next((m for m in self.store.markers_for(self.evidence_id) if m["marker_key"] == key), None)
+
+    def _marker_selected(self, _event=None):
+        marker = self._selected_marker()
+        if marker is not None:
+            if marker["timestamp_seconds"] is not None:
+                self._set_note_time(marker["timestamp_seconds"])
+            self.note_title.delete(0, "end")
+            self.note_title.insert(0, marker["label"])
+
+    def edit_marker(self):
+        try:
+            marker = self._selected_marker()
+            if marker is None:
+                return messagebox.showinfo("Select a marker", "Select the marker to edit, then enter its time and title.")
+            self.store.save_marker(self.evidence_id, self._timestamp(), self.note_title.get(), marker["marker_key"])
+            self._load_notes()
+        except Exception as exc:
+            messagebox.showerror("Unable to edit marker", str(exc))
 
     def _save_reference(self, tab):
         if not self.evidence_id:
@@ -397,14 +530,17 @@ class FingerprinterApp(tk.Tk):
         if review["overall"] == "fail" and not messagebox.askyesno(
                 "Reference review failed", "Checks failed. Save this record anyway (the failures are stored with it)?"):
             return
-        self.store.add_reference(self.evidence_id, tab.metadata().to_dict(), review)
-        messagebox.showinfo("Saved", "Reference record saved (append-only) and bound to the evidence hash.")
+        try:
+            self.store.add_reference(self.evidence_id, tab.metadata().to_dict(), review)
+            messagebox.showinfo("Saved", "Reference record saved (append-only) and bound to the evidence hash.")
+        except Exception as exc:
+            messagebox.showerror("Unable to save reference", str(exc))
 
     def _load_notes(self):
         notes = self.store.notes_for(self.evidence_id) if self.evidence_id else []
         fill(self.notes_view, [(f"{n['timestamp_seconds']:.2f}", n["title"], n["body"]) for n in notes])
         markers = self.store.markers_for(self.evidence_id) if self.evidence_id else []
-        fill(self.markers_view, [(m["marker_key"], f"{m['timestamp_seconds']:.2f}", m["label"]) for m in markers])
+        fill(self.markers_view, [(m["marker_key"], f"{m['timestamp_seconds']:.2f}" if m["timestamp_seconds"] is not None else "—", m["label"]) for m in markers])
 
     def _close(self):
         self.cancel_event.set()
