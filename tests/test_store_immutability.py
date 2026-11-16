@@ -1,4 +1,5 @@
 """Current-schema preservation of compatible legacy case-audit behavior."""
+from contextlib import closing
 import hashlib
 from pathlib import Path
 import sqlite3
@@ -68,7 +69,7 @@ class StoreImmutabilityTests(unittest.TestCase):
     def test_opening_existing_database_preserves_rows_and_installs_guards(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'case.db'
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.executescript('''
                     CREATE TABLE evidence (
                         id INTEGER PRIMARY KEY, source_path TEXT NOT NULL, sha256 TEXT NOT NULL,

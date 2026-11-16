@@ -41,7 +41,7 @@ class DesktopHelperTests(unittest.TestCase):
             p=Path(tmp)/'settings.json'
             for i in range(15): remember_recent(p,Path(tmp)/str(i))
             self.assertEqual(len(load_recent(p)),10)
-            self.assertTrue(load_recent(p)[0].endswith('/14'))
+            self.assertEqual(load_recent(p)[0], str((Path(tmp) / '14').resolve()))
             parent=Path(tmp)/'file'; parent.write_bytes(b'x')
             self.assertEqual(remember_recent(parent/'settings.json',Path(tmp)/'audio.wav'),
                              [str((Path(tmp)/'audio.wav').resolve())])
